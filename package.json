@@ -1,0 +1,22 @@
+{
+  "name": "pi-visual-primitives",
+  "version": "0.1.0",
+  "description": "Pi extension package for cropping image regions from visual primitive bounding boxes.",
+  "type": "module",
+  "keywords": ["pi-package", "pi-extension", "visual-primitives", "bounding-box", "image-crop"],
+  "author": "mapleluvr",
+  "license": "MIT",
+  "scripts": {
+    "check": "node --experimental-strip-types --check index.ts && node --experimental-strip-types --check src/schema.ts && node --experimental-strip-types --check src/crop.ts && node --experimental-strip-types --check src/extension.ts",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "sharp": "^0.34.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}
