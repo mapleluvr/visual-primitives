@@ -41,7 +41,10 @@ export function registerVisualPrimitives(pi: PiLike | ExtensionAPI, _options: Vi
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const details = await cropBoundingBox(params, { cwd: ctx?.cwd ?? process.cwd(), signal });
       return {
-        content: [{ type: "text", text: `Cropped bounding box to ${details.outputPath}` }],
+        content: [{
+          type: "text",
+          text: `Cropped bounding box to ${details.outputPath} (left=${details.resolvedPixelBox.left}, top=${details.resolvedPixelBox.top}, width=${details.resolvedPixelBox.width}, height=${details.resolvedPixelBox.height})`,
+        }],
         details,
       };
     },

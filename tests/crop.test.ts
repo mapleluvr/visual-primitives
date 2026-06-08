@@ -200,3 +200,99 @@ test("cropBoundingBox generates a default output path", async () => {
     });
   });
 });
+
+test("cropBoundingBox strips leading @ from paths", async () => {
+  await withTempDir(async (dir) => {
+    const source = join(dir, "source.png");
+    const output = join(dir, "out.png");
+    await createFixture(source, 40, 30);
+
+    const details = await cropBoundingBox({
+      imagePath: "@source.png",
+      outputPath: "out.png",
+      box: [0, 0, 20, 10],
+      coordinateSpace: "pixel",
+    }, { cwd: dir });
+
+    assert.equal(details.imagePath, source);
+    assert.equal(details.outputPath, output);
+    assert.deepEqual(await imageSize(output), { width: 20, height: 10 });
+  });
+});
+
+test("cropBoundingBox handles bottom-left crop execution", async () => {
+  await withTempDir(async (dir) => {
+    const source = join(dir, "source.png");
+    const output = join(dir, "bottom-left.png");
+    await createFixture(source, 100, 100);
+
+    const details = await cropBoundingBox({
+      imagePath: source,
+      outputPath: output,
+      box: [10, 20, 60, 80],
+      coordinateSpace: "pixel",
+      origin: "bottom-left",
+      boxOrder: "left-bottom-right-top",
+    }, { cwd: dir });
+
+    assert.deepEqual(await imageSize(output), { width: 50, height: 60 });
+    assert.deepEqual(details.resolvedPixelBox, {
+      left: 10,
+      top: 20,
+      right: 60,
+      bottom: 80,
+      width: 50,
+      height: 60,
+    });
+  });
+});
+
+test("cropBoundingBox reports clamp metadata for out-of-bounds crops", async () => {
+  await withTempDir(async (dir) => {
+    const source = join(dir, "source.png");
+    const output = join(dir, "clamped.png");
+    await createFixture(source, 50, 50);
+
+    const details = await cropBoundingBox({
+      imagePath: source,
+      outputPath: output,
+      box: [-5, -5, 20, 20],
+      coordinateSpace: "pixel",
+    }, { cwd: dir });
+
+    assert.equal(details.clamped, true);
+    assert.deepEqual(details.unclampedPixelBox, {
+      left: -5,
+      top: -5,
+      right: 20,
+      bottom: 20,
+      width: 25,
+      height: 25,
+    });
+    assert.deepEqual(details.resolvedPixelBox, {
+      left: 0,
+      top: 0,
+      right: 20,
+      bottom: 20,
+      width: 20,
+      height: 20,
+    });
+    assert.deepEqual(await imageSize(output), { width: 20, height: 20 });
+  });
+});
+
+test("cropBoundingBox rejects invalid runtime boxes", async () => {
+  await withTempDir(async (dir) => {
+    const source = join(dir, "source.png");
+    await createFixture(source, 50, 50);
+
+    await assert.rejects(
+      () => cropBoundingBox({
+        imagePath: source,
+        box: [0, 0, 10] as any,
+        coordinateSpace: "pixel",
+      }, { cwd: dir }),
+      /exactly four/,
+    );
+  });
+});

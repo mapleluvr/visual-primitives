@@ -101,3 +101,52 @@ test("crop_bounding_box execution returns crop result details", async () => {
     /does not exist|cannot be read|Input file is missing/,
   );
 });
+
+test("crop_bounding_box result text includes output and resolved pixel box", async () => {
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const sharp = (await import("sharp")).default;
+
+  const dir = await mkdtemp(join(tmpdir(), "pi-visual-primitives-ext-test-"));
+  try {
+    const source = join(dir, "source.png");
+    const output = join(dir, "crop.png");
+    await sharp({
+      create: {
+        width: 20,
+        height: 20,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 1 },
+      },
+    }).png().toFile(source);
+
+    const tools: RegisteredTool[] = [];
+    const pi = {
+      registerTool(tool: RegisteredTool) {
+        tools.push(tool);
+      },
+    };
+
+    registerVisualPrimitives(pi, { pluginDir: "/plugin" });
+    const result = await tools[0].execute("call-2", {
+      imagePath: source,
+      outputPath: output,
+      box: [1, 2, 11, 12],
+      coordinateSpace: "pixel",
+    }, undefined, undefined, { cwd: dir });
+
+    assert.match(result.content[0].text, /Cropped bounding box to/);
+    assert.match(result.content[0].text, /left=1, top=2, width=10, height=10/);
+    assert.deepEqual((result.details as any).resolvedPixelBox, {
+      left: 1,
+      top: 2,
+      right: 11,
+      bottom: 12,
+      width: 10,
+      height: 10,
+    });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
