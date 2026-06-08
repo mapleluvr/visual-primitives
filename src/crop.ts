@@ -1,6 +1,9 @@
-import { access } from "node:fs/promises";
-import { isAbsolute, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { access, mkdir } from "node:fs/promises";
+import { basename, dirname, extname, isAbsolute, join, resolve } from "node:path";
+import sharp from "sharp";
 import type {
+  BoundingBoxTuple,
   BoxOrder,
   CoordinateOrigin,
   CoordinateSpace,
@@ -47,7 +50,7 @@ function defaultResolveOptions(input: Pick<CropBoundingBoxInput, "coordinateSpac
   };
 }
 
-function assertFiniteBox(box: [number, number, number, number]): void {
+function assertFiniteBox(box: BoundingBoxTuple): void {
   if (!Array.isArray(box) || box.length !== 4) {
     throw new Error("box must contain exactly four coordinates");
   }
@@ -111,10 +114,10 @@ function assertPositiveArea(box: ResolvedPixelBox): void {
 }
 
 function resolvePixelBox(
-  box: [number, number, number, number],
+  box: BoundingBoxTuple,
   image: ImageSize,
   inputOptions: Pick<CropBoundingBoxInput, "coordinateSpace" | "origin" | "boxOrder" | "padding" | "clamp"> = {},
-): { resolvedPixelBox: ResolvedPixelBox; unclampedPixelBox: ResolvedPixelBox; clamped: boolean } {
+): { resolvedPixelBox: ResolvedPixelBox; unclampedPixelBox: ResolvedPixelBox; clamped: boolean; options: ResolveOptions } {
   assertFiniteBox(box);
 
   const options = defaultResolveOptions(inputOptions);
@@ -157,7 +160,18 @@ function resolvePixelBox(
     resolvedPixelBox,
     unclampedPixelBox,
     clamped: !isSameBox(unclampedPixelBox, resolvedPixelBox),
+    options,
   };
+}
+
+function defaultOutputPath(imagePath: string, input: CropBoundingBoxInput): string {
+  const parsedExt = extname(imagePath);
+  const base = basename(imagePath, parsedExt);
+  const hash = createHash("sha256")
+    .update(JSON.stringify({ imagePath, input }))
+    .digest("hex")
+    .slice(0, 12);
+  return join(dirname(imagePath), `${base}.crop-${hash}.png`);
 }
 
 export async function cropBoundingBox(
@@ -175,13 +189,64 @@ export async function cropBoundingBox(
     throw new Error(`Input file is missing or cannot be read: ${imagePath}`);
   }
 
-  throw new Error("cropBoundingBox image processing is not implemented yet");
+  const metadata = await sharp(imagePath).metadata();
+  if (!metadata.width || !metadata.height) {
+    throw new Error(`Unable to determine image dimensions: ${imagePath}`);
+  }
+
+  const { resolvedPixelBox, unclampedPixelBox, clamped, options: resolvedOptions } = resolvePixelBox(
+    input.box,
+    { width: metadata.width, height: metadata.height },
+    input,
+  );
+
+  const outputPath = input.outputPath
+    ? normalizeToolPath(input.outputPath, options.cwd)
+    : defaultOutputPath(imagePath, input);
+
+  await mkdir(dirname(outputPath), { recursive: true });
+
+  if (options.signal?.aborted) {
+    throw new Error("crop_bounding_box was cancelled");
+  }
+
+  await sharp(imagePath)
+    .extract({
+      left: resolvedPixelBox.left,
+      top: resolvedPixelBox.top,
+      width: resolvedPixelBox.width,
+      height: resolvedPixelBox.height,
+    })
+    .png()
+    .toFile(outputPath);
+
+  return {
+    imagePath,
+    outputPath,
+    source: {
+      width: metadata.width,
+      height: metadata.height,
+      format: metadata.format,
+    },
+    input: {
+      box: input.box,
+      coordinateSpace: resolvedOptions.coordinateSpace,
+      origin: resolvedOptions.origin,
+      boxOrder: resolvedOptions.boxOrder,
+      padding: resolvedOptions.padding,
+      clamp: resolvedOptions.clamp,
+    },
+    resolvedPixelBox,
+    unclampedPixelBox,
+    clamped,
+  };
 }
 
 export function resolvePixelBoxForTest(
-  box: [number, number, number, number],
+  box: BoundingBoxTuple,
   image: { width: number; height: number },
   options?: Pick<CropBoundingBoxInput, "coordinateSpace" | "origin" | "boxOrder" | "padding" | "clamp">,
 ): { resolvedPixelBox: ResolvedPixelBox; unclampedPixelBox: ResolvedPixelBox; clamped: boolean } {
-  return resolvePixelBox(box, image, options);
+  const { resolvedPixelBox, unclampedPixelBox, clamped } = resolvePixelBox(box, image, options);
+  return { resolvedPixelBox, unclampedPixelBox, clamped };
 }

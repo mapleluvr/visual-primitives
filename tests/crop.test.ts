@@ -1,6 +1,37 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolvePixelBoxForTest } from "../src/crop.ts";
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import sharp from "sharp";
+import { cropBoundingBox, resolvePixelBoxForTest } from "../src/crop.ts";
+
+async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
+  const dir = await mkdtemp(join(tmpdir(), "pi-visual-primitives-test-"));
+  try {
+    await fn(dir);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+async function createFixture(path: string, width = 100, height = 80): Promise<void> {
+  await sharp({
+    create: {
+      width,
+      height,
+      channels: 4,
+      background: { r: 120, g: 80, b: 40, alpha: 1 },
+    },
+  }).png().toFile(path);
+}
+
+async function imageSize(path: string): Promise<{ width: number; height: number }> {
+  const metadata = await sharp(path).metadata();
+  assert.equal(typeof metadata.width, "number");
+  assert.equal(typeof metadata.height, "number");
+  return { width: metadata.width!, height: metadata.height! };
+}
 
 test("resolves pixel left-top-right-bottom boxes", () => {
   const result = resolvePixelBoxForTest([10, 20, 60, 80], { width: 100, height: 100 }, {
@@ -117,4 +148,55 @@ test("throws on invalid coordinates and zero-area boxes", () => {
     () => resolvePixelBoxForTest([0, 0, 10, 10], { width: 100, height: 100 }, { coordinateSpace: "pixel", padding: -1 }),
     /padding must be a finite non-negative number/,
   );
+});
+
+test("cropBoundingBox writes an explicit pixel-space crop", async () => {
+  await withTempDir(async (dir) => {
+    const source = join(dir, "source.png");
+    const output = join(dir, "crop.png");
+    await createFixture(source, 100, 80);
+
+    const details = await cropBoundingBox({
+      imagePath: source,
+      outputPath: output,
+      box: [10, 20, 60, 50],
+      coordinateSpace: "pixel",
+    }, { cwd: dir });
+
+    assert.equal(details.outputPath, output);
+    assert.deepEqual(await imageSize(output), { width: 50, height: 30 });
+    assert.deepEqual(details.source, { width: 100, height: 80, format: "png" });
+    assert.deepEqual(details.resolvedPixelBox, {
+      left: 10,
+      top: 20,
+      right: 60,
+      bottom: 50,
+      width: 50,
+      height: 30,
+    });
+    assert.equal(details.clamped, false);
+  });
+});
+
+test("cropBoundingBox generates a default output path", async () => {
+  await withTempDir(async (dir) => {
+    const source = join(dir, "source.png");
+    await createFixture(source, 100, 80);
+
+    const details = await cropBoundingBox({
+      imagePath: "source.png",
+      box: [0, 0, 999, 999],
+    }, { cwd: dir });
+
+    assert.match(details.outputPath, /source\.crop-[a-f0-9]{12}\.png$/);
+    assert.deepEqual(await imageSize(details.outputPath), { width: 100, height: 80 });
+    assert.deepEqual(details.input, {
+      box: [0, 0, 999, 999],
+      coordinateSpace: "normalized-999",
+      origin: "top-left",
+      boxOrder: "left-top-right-bottom",
+      padding: 0,
+      clamp: true,
+    });
+  });
 });
