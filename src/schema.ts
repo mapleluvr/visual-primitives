@@ -94,3 +94,122 @@ export const cropBoundingBoxSchema = {
     },
   },
 } as const;
+
+const coordinateProperties = {
+  coordinateSpace: cropBoundingBoxSchema.properties.coordinateSpace,
+  origin: cropBoundingBoxSchema.properties.origin,
+  boxOrder: cropBoundingBoxSchema.properties.boxOrder,
+  padding: cropBoundingBoxSchema.properties.padding,
+  clamp: cropBoundingBoxSchema.properties.clamp,
+} as const;
+
+const labeledBoxSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["box"],
+  properties: {
+    box: cropBoundingBoxSchema.properties.box,
+    label: {
+      type: "string",
+      description: "Optional label used in metadata and deterministic output filenames.",
+    },
+    outputPath: {
+      type: "string",
+      description: "Optional per-box output PNG path. Relative paths resolve against the current Pi working directory.",
+    },
+  },
+} as const;
+
+const annotationBoxSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["box"],
+  properties: {
+    box: cropBoundingBoxSchema.properties.box,
+    label: {
+      type: "string",
+      description: "Optional label drawn near the box and returned in metadata.",
+    },
+    color: {
+      type: "string",
+      description: "Optional SVG/CSS color for the box outline. Defaults to a high-contrast pink.",
+    },
+  },
+} as const;
+
+export const cropMultipleBoundingBoxesSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["imagePath", "boxes"],
+  properties: {
+    imagePath: cropBoundingBoxSchema.properties.imagePath,
+    boxes: {
+      type: "array",
+      minItems: 1,
+      items: labeledBoxSchema,
+      description: "Bounding boxes to crop from the same source image. Fails fast on the first invalid box.",
+    },
+    outputDir: {
+      type: "string",
+      description: "Optional directory for generated crop files. Relative paths resolve against the current Pi working directory.",
+    },
+    ...coordinateProperties,
+  },
+} as const;
+
+export const annotateBoundingBoxesSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["imagePath", "boxes"],
+  properties: {
+    imagePath: cropBoundingBoxSchema.properties.imagePath,
+    boxes: {
+      type: "array",
+      minItems: 1,
+      items: annotationBoxSchema,
+      description: "Bounding boxes to draw over the source image.",
+    },
+    outputPath: {
+      type: "string",
+      description: "Optional annotated PNG path. Relative paths resolve against the current Pi working directory.",
+    },
+    ...coordinateProperties,
+  },
+} as const;
+
+export const cropAroundPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["imagePath", "point"],
+  oneOf: [
+    { required: ["radius"], not: { required: ["size"] } },
+    { required: ["size"], not: { required: ["radius"] } },
+  ],
+  properties: {
+    imagePath: cropBoundingBoxSchema.properties.imagePath,
+    point: {
+      type: "array",
+      minItems: 2,
+      maxItems: 2,
+      items: { type: "number" },
+      description: "Point coordinates to center the crop around.",
+    },
+    radius: {
+      type: "number",
+      exclusiveMinimum: 0,
+      description: "Explicit crop radius in the selected coordinate space. Mutually exclusive with size.",
+    },
+    size: {
+      type: "object",
+      additionalProperties: false,
+      required: ["width", "height"],
+      properties: {
+        width: { type: "number", exclusiveMinimum: 0, description: "Explicit crop width in the selected coordinate space." },
+        height: { type: "number", exclusiveMinimum: 0, description: "Explicit crop height in the selected coordinate space." },
+      },
+      description: "Explicit crop size in the selected coordinate space. Mutually exclusive with radius.",
+    },
+    outputPath: cropBoundingBoxSchema.properties.outputPath,
+    ...coordinateProperties,
+  },
+} as const;

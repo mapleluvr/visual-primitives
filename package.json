@@ -7,7 +7,7 @@
   "author": "mapleluvr",
   "license": "MIT",
   "scripts": {
-    "check": "node --experimental-strip-types --check index.ts && node --experimental-strip-types --check src/schema.ts && node --experimental-strip-types --check src/crop.ts && node --experimental-strip-types --check src/extension.ts",
+    "check": "node --experimental-strip-types --check index.ts && node --experimental-strip-types --check src/schema.ts && node --experimental-strip-types --check src/crop.ts && node --experimental-strip-types --check src/phase2.ts && node --experimental-strip-types --check src/extension.ts",
     "test": "node --experimental-strip-types --test tests/*.test.ts"
   },
   "dependencies": {
@@ -17,6 +17,7 @@
     "@earendil-works/pi-coding-agent": "*"
   },
   "pi": {
-    "extensions": ["./index.ts"]
+    "extensions": ["./index.ts"],
+    "skills": ["./skills"]
   }
 }

@@ -2,7 +2,23 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { cropBoundingBox } from "./crop.ts";
-import { cropBoundingBoxSchema, type CropBoundingBoxInput } from "./schema.ts";
+import {
+  annotateBoundingBoxesSchema,
+  cropAroundPointSchema,
+  cropBoundingBoxSchema,
+  cropMultipleBoundingBoxesSchema,
+  type CropBoundingBoxInput,
+} from "./schema.ts";
+import {
+  annotateBoundingBoxes,
+  cropAroundPoint,
+  cropMultipleBoundingBoxes,
+  type AnnotateBoundingBoxesInput,
+  type CropAroundPointInput,
+  type CropMultipleBoundingBoxesInput,
+} from "./phase2.ts";
+
+type ToolInput = CropBoundingBoxInput | CropMultipleBoundingBoxesInput | AnnotateBoundingBoxesInput | CropAroundPointInput;
 
 interface PiLike {
   registerTool(tool: {
@@ -14,7 +30,7 @@ interface PiLike {
     parameters: unknown;
     execute: (
       toolCallId: string,
-      params: CropBoundingBoxInput,
+      params: ToolInput,
       signal?: AbortSignal,
       onUpdate?: unknown,
       ctx?: { cwd?: string },
@@ -39,11 +55,80 @@ export function registerVisualPrimitives(pi: PiLike | ExtensionAPI, _options: Vi
     ],
     parameters: cropBoundingBoxSchema,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      const details = await cropBoundingBox(params, { cwd: ctx?.cwd ?? process.cwd(), signal });
+      const details = await cropBoundingBox(params as CropBoundingBoxInput, { cwd: ctx?.cwd ?? process.cwd(), signal });
       return {
         content: [{
           type: "text",
           text: `Cropped bounding box to ${details.outputPath} (left=${details.resolvedPixelBox.left}, top=${details.resolvedPixelBox.top}, width=${details.resolvedPixelBox.width}, height=${details.resolvedPixelBox.height})`,
+        }],
+        details,
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "crop_multiple_bounding_boxes",
+    label: "Crop Multiple Bounding Boxes",
+    description: "Crop multiple bounding boxes from the same source image in one fail-fast call.",
+    promptSnippet: "Batch-crop several provided bounding boxes from one image and return per-crop metadata.",
+    promptGuidelines: [
+      "Use crop_multiple_bounding_boxes when several coordinates from the same source image need separate crop files.",
+      "This tool fails fast on the first invalid box; use single crop calls when partial success is required.",
+      "Provide labels when useful; labels are used in metadata and generated filenames.",
+    ],
+    parameters: cropMultipleBoundingBoxesSchema,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      const details = await cropMultipleBoundingBoxes(params as CropMultipleBoundingBoxesInput, { cwd: ctx?.cwd ?? process.cwd(), signal });
+      return {
+        content: [{
+          type: "text",
+          text: `Cropped ${details.crops.length} bounding boxes: ${details.crops.map((crop) => crop.outputPath).join(", ")}`,
+        }],
+        details,
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "annotate_bounding_boxes",
+    label: "Annotate Bounding Boxes",
+    description: "Create an annotated preview image by drawing one or more bounding boxes over the source image.",
+    promptSnippet: "Draw provided boxes over an image to verify coordinate interpretation before or after cropping.",
+    promptGuidelines: [
+      "Use annotate_bounding_boxes to verify whether coordinates map to the intended image regions.",
+      "The output image keeps the source dimensions and overlays simple box outlines and optional labels.",
+      "This tool does not detect or generate boxes; it only draws provided coordinates.",
+    ],
+    parameters: annotateBoundingBoxesSchema,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      const details = await annotateBoundingBoxes(params as AnnotateBoundingBoxesInput, { cwd: ctx?.cwd ?? process.cwd(), signal });
+      return {
+        content: [{
+          type: "text",
+          text: `Annotated ${details.boxes.length} bounding boxes to ${details.outputPath}`,
+        }],
+        details,
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "crop_around_point",
+    label: "Crop Around Point",
+    description: "Crop an image region centered on a provided point using an explicit radius or size.",
+    promptSnippet: "Crop around a point-based visual primitive when the user provides an explicit crop radius or size.",
+    promptGuidelines: [
+      "Use crop_around_point for point-based coordinates, not for guessing an object box.",
+      "Require an explicit radius or size; do not invent a default crop size.",
+      "Coordinate space, origin, padding, and clamp behavior match crop_bounding_box.",
+    ],
+    parameters: cropAroundPointSchema,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      const details = await cropAroundPoint(params as CropAroundPointInput, { cwd: ctx?.cwd ?? process.cwd(), signal });
+      return {
+        content: [{
+          type: "text",
+          text: `Cropped around point to ${details.outputPath} (left=${details.resolvedPixelBox.left}, top=${details.resolvedPixelBox.top}, width=${details.resolvedPixelBox.width}, height=${details.resolvedPixelBox.height})`,
         }],
         details,
       };

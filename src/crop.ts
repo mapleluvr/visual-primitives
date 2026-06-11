@@ -174,14 +174,11 @@ function defaultOutputPath(imagePath: string, input: CropBoundingBoxInput): stri
   return join(dirname(imagePath), `${base}.crop-${hash}.png`);
 }
 
-export async function cropBoundingBox(
+export async function resolveCropBoundingBoxDetails(
   input: CropBoundingBoxInput,
   options: CropBoundingBoxOptions,
+  outputPath: string,
 ): Promise<CropBoundingBoxDetails> {
-  if (options.signal?.aborted) {
-    throw new Error("crop_bounding_box was cancelled");
-  }
-
   const imagePath = normalizeToolPath(input.imagePath, options.cwd);
   try {
     await access(imagePath);
@@ -199,26 +196,6 @@ export async function cropBoundingBox(
     { width: metadata.width, height: metadata.height },
     input,
   );
-
-  const outputPath = input.outputPath
-    ? normalizeToolPath(input.outputPath, options.cwd)
-    : defaultOutputPath(imagePath, input);
-
-  await mkdir(dirname(outputPath), { recursive: true });
-
-  if (options.signal?.aborted) {
-    throw new Error("crop_bounding_box was cancelled");
-  }
-
-  await sharp(imagePath)
-    .extract({
-      left: resolvedPixelBox.left,
-      top: resolvedPixelBox.top,
-      width: resolvedPixelBox.width,
-      height: resolvedPixelBox.height,
-    })
-    .png()
-    .toFile(outputPath);
 
   return {
     imagePath,
@@ -240,6 +217,46 @@ export async function cropBoundingBox(
     unclampedPixelBox,
     clamped,
   };
+}
+
+export async function cropBoundingBox(
+  input: CropBoundingBoxInput,
+  options: CropBoundingBoxOptions,
+): Promise<CropBoundingBoxDetails> {
+  if (options.signal?.aborted) {
+    throw new Error("crop_bounding_box was cancelled");
+  }
+
+  const imagePath = normalizeToolPath(input.imagePath, options.cwd);
+  try {
+    await access(imagePath);
+  } catch {
+    throw new Error(`Input file is missing or cannot be read: ${imagePath}`);
+  }
+
+  const outputPath = input.outputPath
+    ? normalizeToolPath(input.outputPath, options.cwd)
+    : defaultOutputPath(imagePath, input);
+
+  const details = await resolveCropBoundingBoxDetails(input, options, outputPath);
+
+  await mkdir(dirname(outputPath), { recursive: true });
+
+  if (options.signal?.aborted) {
+    throw new Error("crop_bounding_box was cancelled");
+  }
+
+  await sharp(imagePath)
+    .extract({
+      left: details.resolvedPixelBox.left,
+      top: details.resolvedPixelBox.top,
+      width: details.resolvedPixelBox.width,
+      height: details.resolvedPixelBox.height,
+    })
+    .png()
+    .toFile(outputPath);
+
+  return details;
 }
 
 export function resolvePixelBoxForTest(

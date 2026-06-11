@@ -18,7 +18,7 @@ interface RegisteredTool {
   ) => Promise<{ content: Array<{ type: "text"; text: string }>; details?: unknown }>;
 }
 
-test("registerVisualPrimitives registers crop_bounding_box", () => {
+function registeredTools(): RegisteredTool[] {
   const tools: RegisteredTool[] = [];
   const pi = {
     registerTool(tool: RegisteredTool) {
@@ -27,14 +27,19 @@ test("registerVisualPrimitives registers crop_bounding_box", () => {
   };
 
   registerVisualPrimitives(pi, { pluginDir: "/plugin" });
+  return tools;
+}
 
-  assert.equal(tools.length, 1);
-  assert.equal(tools[0].name, "crop_bounding_box");
-  assert.equal(tools[0].label, "Crop Bounding Box");
-  assert.match(tools[0].description, /normalized 0-999/);
-  assert.match(tools[0].promptSnippet ?? "", /Crop image regions/);
-  assert.ok(tools[0].promptGuidelines?.some((line) => line.includes("bottom-left")));
-  assert.deepEqual(tools[0].parameters, {
+test("registerVisualPrimitives registers crop_bounding_box", () => {
+  const tools = registeredTools();
+  const tool = tools.find((candidate) => candidate.name === "crop_bounding_box");
+
+  assert.ok(tool);
+  assert.equal(tool.label, "Crop Bounding Box");
+  assert.match(tool.description, /normalized 0-999/);
+  assert.match(tool.promptSnippet ?? "", /Crop image regions/);
+  assert.ok(tool.promptGuidelines?.some((line) => line.includes("bottom-left")));
+  assert.deepEqual(tool.parameters, {
     type: "object",
     additionalProperties: false,
     required: ["imagePath", "box"],
@@ -81,16 +86,23 @@ test("registerVisualPrimitives registers crop_bounding_box", () => {
   });
 });
 
-test("crop_bounding_box execution returns crop result details", async () => {
-  const tools: RegisteredTool[] = [];
-  const pi = {
-    registerTool(tool: RegisteredTool) {
-      tools.push(tool);
-    },
-  };
+test("registerVisualPrimitives registers visual primitive helper tools", () => {
+  const tools = registeredTools();
 
-  registerVisualPrimitives(pi, { pluginDir: "/plugin" });
-  const tool = tools[0];
+  assert.deepEqual(tools.map((tool) => tool.name), [
+    "crop_bounding_box",
+    "crop_multiple_bounding_boxes",
+    "annotate_bounding_boxes",
+    "crop_around_point",
+  ]);
+  assert.match(tools[1].description, /multiple bounding boxes/);
+  assert.match(tools[2].description, /annotated preview/);
+  assert.match(tools[3].description, /point/);
+});
+
+test("crop_bounding_box execution returns crop result details", async () => {
+  const tool = registeredTools().find((candidate) => candidate.name === "crop_bounding_box");
+  assert.ok(tool);
 
   await assert.rejects(
     () => tool.execute("call-1", {
@@ -121,15 +133,9 @@ test("crop_bounding_box result text includes output and resolved pixel box", asy
       },
     }).png().toFile(source);
 
-    const tools: RegisteredTool[] = [];
-    const pi = {
-      registerTool(tool: RegisteredTool) {
-        tools.push(tool);
-      },
-    };
-
-    registerVisualPrimitives(pi, { pluginDir: "/plugin" });
-    const result = await tools[0].execute("call-2", {
+    const tool = registeredTools().find((candidate) => candidate.name === "crop_bounding_box");
+    assert.ok(tool);
+    const result = await tool.execute("call-2", {
       imagePath: source,
       outputPath: output,
       box: [1, 2, 11, 12],
