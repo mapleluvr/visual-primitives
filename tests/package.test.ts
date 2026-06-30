@@ -35,29 +35,40 @@ test("visual-primitives Skill has valid discoverable frontmatter", async () => {
 
   assert.match(skill, /^---\n/);
   assert.match(skill, /\nname: visual-primitives\n/);
-  assert.match(skill, /\ndescription: Use when .*visual-primitive.*bounding box/ms);
+  assert.match(skill, /\ndescription: Use for any task involving .*screenshots.*frontend visual reproduction.*bounding boxes/ms);
   assert.match(skill, /\n---\n/);
 });
 
-test("visual-primitives Skill documents crop_bounding_box workflow safeguards", async () => {
+test("visual-primitives Skill documents visual evidence workflow safeguards", async () => {
   const skill = await readText(join("skills", "visual-primitives", "SKILL.md"));
 
+  assert.match(skill, /visual evidence/i);
+  assert.match(skill, /Coordinates are not the trigger/i);
+  assert.match(skill, /frontend visual reproduction/i);
+  assert.match(skill, /screenshot/i);
+  assert.match(skill, /visual comparison/i);
+  assert.match(skill, /UI visual QA/i);
+  assert.match(skill, /estimated/i);
+  assert.match(skill, /annotate_bounding_boxes/);
+  assert.match(skill, /crop_multiple_bounding_boxes/);
+  assert.match(skill, /crop_around_point/);
   assert.match(skill, /normalized-999/);
   assert.match(skill, /pixel/);
   assert.match(skill, /top-left/);
   assert.match(skill, /bottom-left/);
   assert.match(skill, /left-top-right-bottom/);
-  assert.match(skill, /outputPath/);
-  assert.match(skill, /padding/);
-  assert.match(skill, /clamp/);
-  assert.match(skill, /default to `normalized-999` unless/i);
-  assert.match(skill, /crop_bounding_box/);
   assert.match(skill, /does not generate bounding boxes/i);
+  assert.match(skill, /does not detect/i);
 });
 
-test("README documents Phase 2 auxiliary tools", async () => {
+test("README documents visual evidence workflows and Phase 2 auxiliary tools", async () => {
   const readme = await readText("README.md");
 
+  assert.match(readme, /visual evidence workflow/i);
+  assert.match(readme, /screenshots/i);
+  assert.match(readme, /frontend visual reproduction/i);
+  assert.match(readme, /visual QA/i);
+  assert.match(readme, /Coordinates are not the trigger/i);
   assert.match(readme, /## Tool: `crop_multiple_bounding_boxes`/);
   assert.match(readme, /## Tool: `annotate_bounding_boxes`/);
   assert.match(readme, /## Tool: `crop_around_point`/);
@@ -73,6 +84,17 @@ test("visual-primitives Skill routes Phase 2 workflows to helper tools", async (
   assert.match(skill, /crop_around_point/);
   assert.match(skill, /smallest suitable tool/i);
   assert.match(skill, /do not invent a default size/i);
+});
+
+test("visual-primitives Skill documents multi-image proofreading workflow", async () => {
+  const skill = await readText(join("skills", "visual-primitives", "SKILL.md"));
+
+  assert.match(skill, /multi-image proofreading/i);
+  assert.match(skill, /two or more images/i);
+  assert.match(skill, /annotate_bounding_boxes[\s\S]*crop_multiple_bounding_boxes/);
+  assert.match(skill, /quantify region sizes/i);
+  assert.match(skill, /width.*height.*area/i);
+  assert.match(skill, /directly inspect the tool results/i);
 });
 
 test("roadmap records Phase 2 as implemented while keeping UI deferred", async () => {

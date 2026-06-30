@@ -1,11 +1,15 @@
 # Pi Visual Primitives
 
-Pi Visual Primitives is a Pi extension package that gives agents visual-coordinate helper tools. The package crops image regions from explicit bounding boxes, batch-crops several provided boxes, annotates boxes over a source image, and crops around explicit points. These are useful when a multimodal model or user provides visual-primitive coordinates.
+Pi Visual Primitives is a Pi extension package that gives agents visual evidence workflow helper tools. Use it for tasks involving images, screenshots, rendered UI, reference designs, visual effects, frontend visual reproduction, visual comparison, or visual QA when the agent needs to draw conclusions from visual appearance.
 
-The design is inspired by the "Thinking with Visual Primitives" paper overview: points and bounding boxes can act as concrete spatial references during visual reasoning. This package does not generate boxes, detect objects, or infer coordinates. It turns existing coordinates into local crop or annotation artifacts that an agent can inspect or reuse.
+Coordinates are not the trigger. A need for visual evidence is the trigger. The package creates local crop and annotation artifacts that agents can inspect or reuse while reasoning about visuals.
+
+The design is inspired by the "Thinking with Visual Primitives" paper overview: points and bounding boxes can act as concrete spatial references during visual reasoning. This package does not generate boxes, detect objects, OCR text, segment images, or infer UI elements automatically. It turns user-provided or agent-estimated regions into local crop or annotation artifacts.
 
 ## Features
 
+- Create visual evidence artifacts for screenshot analysis, frontend visual reproduction, visual comparison, and visual QA.
+- Annotate or crop UI regions such as headers, cards, sidebars, forms, buttons, charts, and footers.
 - Crop one bounding box from a local image.
 - Batch-crop multiple boxes from the same image with deterministic output names.
 - Create same-size annotated preview images with box outlines and optional labels.
@@ -43,17 +47,25 @@ Then run `/reload` in Pi.
 
 ## Skill: `visual-primitives`
 
-This package also includes a real Pi Skill at `skills/visual-primitives/SKILL.md`. The Skill teaches agents when and how to use `crop_bounding_box` for visual-primitive workflows.
+This package also includes a real Pi Skill at `skills/visual-primitives/SKILL.md`. The Skill teaches agents to use visual evidence workflows for screenshots, UI visual effects, frontend visual reproduction, visual comparison, visual QA, and coordinate-defined region inspection.
 
 Use it when a prompt involves:
 
-- visual-primitive bounding boxes
-- normalized `0-999` coordinates
-- explicit pixel boxes
+- screenshots, images, diagrams, rendered UI, or reference designs
+- frontend visual reproduction or screenshot-to-code tasks
+- visual comparison between a reference and current implementation
+- UI visual QA for spacing, alignment, typography, color, shadows, borders, radius, hierarchy, or layout
+- visual-primitive bounding boxes, normalized `0-999` coordinates, explicit pixel boxes, or point references
 - top-left or bottom-left coordinate systems
-- cropping and inspecting a coordinate-defined image region
+- cropping, annotating, zooming into, inspecting, or reusing visual regions
 
-The Skill intentionally reinforces that this package does not generate bounding boxes. It only helps agents crop and inspect regions from existing coordinates.
+The Skill intentionally reinforces that crops and annotations are evidence artifacts, not prerequisites. It also reinforces that this package does not generate bounding boxes or detect objects; it helps agents inspect user-provided or agent-estimated regions.
+
+## Visual Evidence Workflow Example
+
+For a prompt like `Recreate this dashboard screenshot and match the spacing`, an agent should identify the screenshot, decide which visual conclusions need evidence, annotate major regions such as `sidebar`, `header`, `primary-card`, and `button`, crop important areas for focused inspection, implement the UI, then compare equivalent reference/current regions after rendering.
+
+For screenshots and rendered UI, prefer `coordinateSpace: "pixel"` unless the source clearly uses normalized visual-primitive coordinates. For paper-style visual primitive coordinates, use the default `normalized-999` behavior.
 
 ## Tool: `crop_bounding_box`
 

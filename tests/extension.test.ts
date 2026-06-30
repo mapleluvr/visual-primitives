@@ -36,8 +36,8 @@ test("registerVisualPrimitives registers crop_bounding_box", () => {
 
   assert.ok(tool);
   assert.equal(tool.label, "Crop Bounding Box");
-  assert.match(tool.description, /normalized 0-999/);
-  assert.match(tool.promptSnippet ?? "", /Crop image regions/);
+  assert.match(tool.description, /visual-primitive normalized 0-999/);
+  assert.match(tool.promptSnippet ?? "", /visually relevant region/);
   assert.ok(tool.promptGuidelines?.some((line) => line.includes("bottom-left")));
   assert.deepEqual(tool.parameters, {
     type: "object",
@@ -95,9 +95,36 @@ test("registerVisualPrimitives registers visual primitive helper tools", () => {
     "annotate_bounding_boxes",
     "crop_around_point",
   ]);
-  assert.match(tools[1].description, /multiple bounding boxes/);
+  assert.match(tools[1].description, /multiple regions/);
   assert.match(tools[2].description, /annotated preview/);
-  assert.match(tools[3].description, /point/);
+  assert.match(tools[3].description, /point of interest/);
+});
+
+test("registered tools guide proactive visual evidence workflows", () => {
+  const tools = registeredTools();
+  const crop = tools.find((candidate) => candidate.name === "crop_bounding_box");
+  const multi = tools.find((candidate) => candidate.name === "crop_multiple_bounding_boxes");
+  const annotate = tools.find((candidate) => candidate.name === "annotate_bounding_boxes");
+  const point = tools.find((candidate) => candidate.name === "crop_around_point");
+
+  assert.ok(crop);
+  assert.ok(multi);
+  assert.ok(annotate);
+  assert.ok(point);
+
+  assert.match(`${crop.description} ${crop.promptSnippet} ${crop.promptGuidelines?.join(" ")}`, /screenshot/i);
+  assert.match(`${crop.description} ${crop.promptSnippet} ${crop.promptGuidelines?.join(" ")}`, /UI reproduction|visual QA/i);
+  assert.match(`${crop.description} ${crop.promptSnippet} ${crop.promptGuidelines?.join(" ")}`, /inspect the crop/i);
+
+  assert.match(`${multi.description} ${multi.promptSnippet} ${multi.promptGuidelines?.join(" ")}`, /complex image|complex screenshot|UI/i);
+  assert.match(`${multi.description} ${multi.promptSnippet} ${multi.promptGuidelines?.join(" ")}`, /header.*card.*sidebar|semantic region/i);
+
+  assert.match(`${annotate.description} ${annotate.promptSnippet} ${annotate.promptGuidelines?.join(" ")}`, /region assumptions/i);
+  assert.match(`${annotate.description} ${annotate.promptSnippet} ${annotate.promptGuidelines?.join(" ")}`, /frontend reproduction|visual comparison/i);
+  assert.match(`${annotate.description} ${annotate.promptSnippet} ${annotate.promptGuidelines?.join(" ")}`, /does not detect/i);
+
+  assert.match(`${point.description} ${point.promptSnippet} ${point.promptGuidelines?.join(" ")}`, /point of interest/i);
+  assert.match(`${point.description} ${point.promptSnippet} ${point.promptGuidelines?.join(" ")}`, /alignment issue|overlap/i);
 });
 
 test("crop_bounding_box execution returns crop result details", async () => {
