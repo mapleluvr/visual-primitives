@@ -14,6 +14,7 @@ The design is inspired by the "Thinking with Visual Primitives" paper overview: 
 - Batch-crop multiple boxes from the same image with deterministic output names.
 - Create same-size annotated preview images with box outlines and optional labels.
 - Crop around an explicit point using a required radius or width/height.
+- Sample exact colors at provided points with `sample_colors` for CSS-level color precision.
 - Supports paper-style normalized `0-999` coordinates.
 - Supports direct pixel coordinates.
 - Supports top-left and bottom-left coordinate origins.
@@ -45,27 +46,36 @@ pi install ./pi-visual-primitives
 
 Then run `/reload` in Pi.
 
-## Skill: `visual-primitives`
+## Skill Set
 
-This package also includes a real Pi Skill at `skills/visual-primitives/SKILL.md`. The Skill teaches agents to use visual evidence workflows for screenshots, UI visual effects, frontend visual reproduction, visual comparison, visual QA, and coordinate-defined region inspection.
+This package includes a Pi Skill Set under `skills/`:
 
-Use it when a prompt involves:
+- `skills/using-visual-primitives/SKILL.md` for general visual evidence work: marking, cropping, comparing, aligning, and analyzing images.
+- `skills/frontend-replication/SKILL.md` as the gateway for oracle-image-driven frontend replication.
+- `skills/inline-replication/SKILL.md` for parent-agent execution loops.
+- `skills/subagent-driven-replication/SKILL.md` for orchestrated subagent replication loops. This route uses optional environment support from `pi-subagents`, `subagent-driven-development`, and superpowers workflows; use `inline-replication` when those are unavailable.
+- `skills/refining-with-feedback/SKILL.md` for turning process verdicts into feedback drafts.
+- `skills/finalizing-replication/SKILL.md` for final direct inspection and delivery review.
 
-- screenshots, images, diagrams, rendered UI, or reference designs
-- frontend visual reproduction or screenshot-to-code tasks
-- visual comparison between a reference and current implementation
-- UI visual QA for spacing, alignment, typography, color, shadows, borders, radius, hierarchy, or layout
-- visual-primitive bounding boxes, normalized `0-999` coordinates, explicit pixel boxes, or point references
-- top-left or bottom-left coordinate systems
-- cropping, annotating, zooming into, inspecting, or reusing visual regions
-
-The Skill intentionally reinforces that crops and annotations are evidence artifacts, not prerequisites. It also reinforces that this package does not generate bounding boxes or detect objects; it helps agents inspect user-provided or agent-estimated regions.
+The legacy single `visual-primitives` Skill entry has been retired. Use `using-visual-primitives` for standalone visual evidence tasks and `frontend-replication` for screenshot-oracle webpage reproduction.
 
 ## Visual Evidence Workflow Example
 
 For a prompt like `Recreate this dashboard screenshot and match the spacing`, an agent should identify the screenshot, decide which visual conclusions need evidence, annotate major regions such as `sidebar`, `header`, `primary-card`, and `button`, crop important areas for focused inspection, implement the UI, then compare equivalent reference/current regions after rendering.
 
 For screenshots and rendered UI, prefer `coordinateSpace: "pixel"` unless the source clearly uses normalized visual-primitive coordinates. For paper-style visual primitive coordinates, use the default `normalized-999` behavior.
+
+## Masked Oracle Diff CLI
+
+`masked-oracle-diff` compares an oracle image and rendered image while excluding narrowly justified non-code-drawable regions. Everything outside the exclusion boxes is scored.
+
+Run it with:
+
+```bash
+npm run oracle:diff -- --manifest docs/visual-primitives/runs/<run-id>/scripts/diff-manifest.json
+```
+
+The CLI writes `diff.gray.png`, masks, previews, a `25 x 25` matrix, components, stripes, `summary.json`, and `VERDICT.md` into the manifest `outputDir`.
 
 ## Tool: `crop_bounding_box`
 
@@ -131,6 +141,26 @@ Example:
 ```
 
 Use this to verify coordinate-space, origin, or box-order assumptions before making visual claims.
+
+## Tool: `sample_colors`
+
+Samples exact pixel or patch colors at provided points in a source image. Use it when CSS-level color precision matters.
+
+Example:
+
+```json
+{
+  "imagePath": "scene.png",
+  "coordinateSpace": "pixel",
+  "patchSize": 3,
+  "points": [
+    { "label": "header-bg", "point": [130, 40] },
+    { "label": "cta-button", "point": [620, 340] }
+  ]
+}
+```
+
+The tool returns resolved pixel points plus RGB, hex, OKLab, patch size, sampled pixel count, and patch mean hex values. It samples only user- or agent-provided points; it does not detect palettes or dominant colors.
 
 ## Tool: `crop_around_point`
 

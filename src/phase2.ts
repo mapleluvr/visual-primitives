@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { access, mkdir } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, resolve } from "node:path";
 import sharp from "sharp";
-import type { BoundingBoxTuple, CropBoundingBoxDetails, CropBoundingBoxInput } from "./schema.ts";
+import type { BoundingBoxTuple, CoordinateOrigin, CoordinateSpace, CropBoundingBoxDetails, CropBoundingBoxInput, SampleColorsInput } from "./schema.ts";
 import { cropBoundingBox, resolveCropBoundingBoxDetails } from "./crop.ts";
 
 export interface CropMultipleBoundingBoxesInput extends Omit<CropBoundingBoxInput, "box" | "outputPath"> {
@@ -60,6 +60,37 @@ export type CropAroundPointDetails = CropBoundingBoxDetails & {
   };
 };
 
+export interface SampleColorsDetails {
+  imagePath: string;
+  source: {
+    width: number;
+    height: number;
+    format?: string;
+  };
+  input: {
+    coordinateSpace: CoordinateSpace;
+    origin: CoordinateOrigin;
+    patchSize: number;
+  };
+  samples: Array<{
+    index: number;
+    label?: string;
+    inputPoint: [number, number];
+    resolvedPixelPoint: { x: number; y: number };
+    rgb: { r: number; g: number; b: number };
+    alpha: number;
+    hex: string;
+    oklab: { l: number; a: number; b: number };
+    patch: {
+      size: number;
+      sampledPixels: number;
+      bounds: { left: number; top: number; right: number; bottom: number; width: number; height: number };
+      meanRgb: { r: number; g: number; b: number };
+      meanHex: string;
+    };
+  }>;
+}
+
 interface ToolOptions {
   cwd: string;
   signal?: AbortSignal;
@@ -107,6 +138,76 @@ function assertFinitePoint(point: [number, number]): void {
   if (!Array.isArray(point) || point.length !== 2 || !point.every((value) => Number.isFinite(value))) {
     throw new Error("point must contain exactly two finite coordinates");
   }
+}
+
+function normalizePatchSize(value: number | undefined): number {
+  const size = value ?? 1;
+  if (!Number.isInteger(size) || size < 1) {
+    throw new Error("patchSize must be a positive integer");
+  }
+  return size % 2 === 0 ? size + 1 : size;
+}
+
+function scalePointCoordinate(value: number, size: number, coordinateSpace: CoordinateSpace): number {
+  if (coordinateSpace === "pixel") return Math.round(value);
+  return Math.round((value / 999) * (size - 1));
+}
+
+function clampPixelIndex(value: number, size: number): number {
+  return Math.max(0, Math.min(size - 1, value));
+}
+
+function resolvePixelPoint(
+  point: [number, number],
+  image: { width: number; height: number },
+  coordinateSpace: CoordinateSpace,
+  origin: CoordinateOrigin,
+): { x: number; y: number } {
+  assertFinitePoint(point);
+  const x = clampPixelIndex(scalePointCoordinate(point[0], image.width, coordinateSpace), image.width);
+  const yInSpace = scalePointCoordinate(point[1], image.height, coordinateSpace);
+  const y = origin === "bottom-left" ? image.height - 1 - yInSpace : yInSpace;
+  return { x, y: clampPixelIndex(y, image.height) };
+}
+
+function toHex(rgb: { r: number; g: number; b: number }): string {
+  return `#${[rgb.r, rgb.g, rgb.b].map((value) => Math.round(value).toString(16).padStart(2, "0")).join("")}`;
+}
+
+function linearSrgb(value: number): number {
+  const normalized = value / 255;
+  return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+}
+
+function cbrt(value: number): number {
+  return Math.sign(value) * Math.abs(value) ** (1 / 3);
+}
+
+function rgbToOklab(rgb: { r: number; g: number; b: number }): { l: number; a: number; b: number } {
+  const r = linearSrgb(rgb.r);
+  const g = linearSrgb(rgb.g);
+  const b = linearSrgb(rgb.b);
+  const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+  const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+  const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+  const l_ = cbrt(l);
+  const m_ = cbrt(m);
+  const s_ = cbrt(s);
+  return {
+    l: 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+    a: 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+    b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_,
+  };
+}
+
+function readPixel(raw: Buffer, width: number, x: number, y: number): { r: number; g: number; b: number; alpha: number } {
+  const offset = (y * width + x) * 4;
+  return {
+    r: raw[offset],
+    g: raw[offset + 1],
+    b: raw[offset + 2],
+    alpha: raw[offset + 3],
+  };
 }
 
 function pointBox(input: CropAroundPointInput): BoundingBoxTuple {
@@ -261,5 +362,102 @@ export async function cropAroundPoint(
       radius: input.radius,
       size: input.size,
     },
+  };
+}
+
+export async function sampleColors(
+  input: SampleColorsInput,
+  options: ToolOptions,
+): Promise<SampleColorsDetails> {
+  if (!Array.isArray(input.points) || input.points.length === 0) {
+    throw new Error("points must contain at least one point");
+  }
+
+  const imagePath = normalizeToolPath(input.imagePath, options.cwd);
+  try {
+    await access(imagePath);
+  } catch {
+    throw new Error(`Input file is missing or cannot be read: ${imagePath}`);
+  }
+
+  const image = sharp(imagePath).ensureAlpha();
+  const metadata = await image.metadata();
+  if (!metadata.width || !metadata.height) {
+    throw new Error(`Unable to determine image dimensions: ${imagePath}`);
+  }
+
+  const { data } = await image.raw().toBuffer({ resolveWithObject: true });
+  const coordinateSpace = input.coordinateSpace ?? "normalized-999";
+  const origin = input.origin ?? "top-left";
+  const patchSize = normalizePatchSize(input.patchSize);
+  const radius = Math.floor(patchSize / 2);
+
+  const samples = input.points.map((item, index) => {
+    const point = item.point;
+    const resolved = resolvePixelPoint(point, { width: metadata.width!, height: metadata.height! }, coordinateSpace, origin);
+    const pixel = readPixel(data, metadata.width!, resolved.x, resolved.y);
+    const left = Math.max(0, resolved.x - radius);
+    const right = Math.min(metadata.width!, resolved.x + radius + 1);
+    const top = Math.max(0, resolved.y - radius);
+    const bottom = Math.min(metadata.height!, resolved.y + radius + 1);
+    let totalR = 0;
+    let totalG = 0;
+    let totalB = 0;
+    let count = 0;
+    for (let y = top; y < bottom; y += 1) {
+      for (let x = left; x < right; x += 1) {
+        const sampled = readPixel(data, metadata.width!, x, y);
+        totalR += sampled.r;
+        totalG += sampled.g;
+        totalB += sampled.b;
+        count += 1;
+      }
+    }
+    const meanRgb = {
+      r: Math.round(totalR / count),
+      g: Math.round(totalG / count),
+      b: Math.round(totalB / count),
+    };
+    const rgb = { r: pixel.r, g: pixel.g, b: pixel.b };
+
+    return {
+      index,
+      label: item.label,
+      inputPoint: point,
+      resolvedPixelPoint: resolved,
+      rgb,
+      alpha: pixel.alpha,
+      hex: toHex(rgb),
+      oklab: rgbToOklab(rgb),
+      patch: {
+        size: patchSize,
+        sampledPixels: count,
+        bounds: {
+          left,
+          top,
+          right,
+          bottom,
+          width: right - left,
+          height: bottom - top,
+        },
+        meanRgb,
+        meanHex: toHex(meanRgb),
+      },
+    };
+  });
+
+  return {
+    imagePath,
+    source: {
+      width: metadata.width,
+      height: metadata.height,
+      format: metadata.format,
+    },
+    input: {
+      coordinateSpace,
+      origin,
+      patchSize,
+    },
+    samples,
   };
 }

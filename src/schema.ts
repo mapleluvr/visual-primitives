@@ -7,6 +7,7 @@ export type CoordinateOrigin = typeof ORIGINS[number];
 export type BoxOrder = typeof BOX_ORDERS[number];
 
 export type BoundingBoxTuple = [number, number, number, number];
+export type PointTuple = [number, number];
 
 export interface CropBoundingBoxInput {
   imagePath: string;
@@ -26,6 +27,19 @@ export interface ResolvedPixelBox {
   height: number;
   right: number;
   bottom: number;
+}
+
+export interface SampleColorPointInput {
+  point: PointTuple;
+  label?: string;
+}
+
+export interface SampleColorsInput {
+  imagePath: string;
+  points: SampleColorPointInput[];
+  coordinateSpace?: CoordinateSpace;
+  origin?: CoordinateOrigin;
+  patchSize?: number;
 }
 
 export interface CropBoundingBoxDetails {
@@ -177,6 +191,27 @@ export const annotateBoundingBoxesSchema = {
   },
 } as const;
 
+const pointSchema = {
+  type: "array",
+  minItems: 2,
+  maxItems: 2,
+  items: { type: "number" },
+  description: "Point coordinates.",
+} as const;
+
+const labeledPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["point"],
+  properties: {
+    point: pointSchema,
+    label: {
+      type: "string",
+      description: "Optional label returned in sampled color metadata.",
+    },
+  },
+} as const;
+
 export const cropAroundPointSchema = {
   type: "object",
   additionalProperties: false,
@@ -188,10 +223,7 @@ export const cropAroundPointSchema = {
   properties: {
     imagePath: cropBoundingBoxSchema.properties.imagePath,
     point: {
-      type: "array",
-      minItems: 2,
-      maxItems: 2,
-      items: { type: "number" },
+      ...pointSchema,
       description: "Point coordinates to center the crop around.",
     },
     radius: {
@@ -211,5 +243,28 @@ export const cropAroundPointSchema = {
     },
     outputPath: cropBoundingBoxSchema.properties.outputPath,
     ...coordinateProperties,
+  },
+} as const;
+
+export const sampleColorsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["imagePath", "points"],
+  properties: {
+    imagePath: cropBoundingBoxSchema.properties.imagePath,
+    points: {
+      type: "array",
+      minItems: 1,
+      items: labeledPointSchema,
+      description: "Points to sample from the source image.",
+    },
+    coordinateSpace: cropBoundingBoxSchema.properties.coordinateSpace,
+    origin: cropBoundingBoxSchema.properties.origin,
+    patchSize: {
+      type: "integer",
+      minimum: 1,
+      default: 1,
+      description: "Odd positive square patch size in pixels. Even values are rounded up to the next odd value.",
+    },
   },
 } as const;

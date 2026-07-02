@@ -26,6 +26,22 @@ async function createFixture(path: string, width = 100, height = 80): Promise<vo
   }).png().toFile(path);
 }
 
+async function createColorFixture(path: string): Promise<void> {
+  const width = 5;
+  const height = 5;
+  const data = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * 4;
+      data[offset] = x * 40;
+      data[offset + 1] = y * 50;
+      data[offset + 2] = 20;
+      data[offset + 3] = 255;
+    }
+  }
+  await sharp(data, { raw: { width, height, channels: 4 } }).png().toFile(path);
+}
+
 async function imageSize(path: string): Promise<{ width: number; height: number }> {
   const metadata = await sharp(path).metadata();
   assert.equal(typeof metadata.width, "number");
@@ -194,5 +210,53 @@ test("cropAroundPoint requires an explicit radius or size", async () => {
       }, { cwd: dir }),
       /radius or size/,
     );
+  });
+});
+
+test("sampleColors returns exact point and patch color evidence", async () => {
+  await withTempDir(async (dir) => {
+    const source = join(dir, "colors.png");
+    await createColorFixture(source);
+
+    const { sampleColors } = phase2Module as any;
+    const details = await sampleColors({
+      imagePath: "colors.png",
+      coordinateSpace: "pixel",
+      patchSize: 3,
+      points: [
+        { label: "center", point: [2, 2] },
+        { label: "bottom-left", point: [0, 0] },
+      ],
+    }, { cwd: dir });
+
+    assert.equal(details.samples.length, 2);
+    assert.equal(details.samples[0].label, "center");
+    assert.deepEqual(details.samples[0].resolvedPixelPoint, { x: 2, y: 2 });
+    assert.deepEqual(details.samples[0].rgb, { r: 80, g: 100, b: 20 });
+    assert.equal(details.samples[0].hex, "#506414");
+    assert.equal(details.samples[0].patch.size, 3);
+    assert.equal(details.samples[0].patch.sampledPixels, 9);
+    assert.equal(details.samples[0].patch.meanHex, "#506414");
+    assert.equal(typeof details.samples[0].oklab.l, "number");
+    assert.deepEqual(details.samples[1].resolvedPixelPoint, { x: 0, y: 0 });
+    assert.equal(details.samples[1].patch.sampledPixels, 4);
+  });
+});
+
+test("sampleColors supports normalized bottom-left point coordinates", async () => {
+  await withTempDir(async (dir) => {
+    const source = join(dir, "colors.png");
+    await createColorFixture(source);
+
+    const { sampleColors } = phase2Module as any;
+    const details = await sampleColors({
+      imagePath: source,
+      coordinateSpace: "normalized-999",
+      origin: "bottom-left",
+      points: [{ label: "top-left", point: [0, 999] }],
+    }, { cwd: dir });
+
+    assert.deepEqual(details.samples[0].resolvedPixelPoint, { x: 0, y: 0 });
+    assert.deepEqual(details.samples[0].rgb, { r: 0, g: 0, b: 20 });
   });
 });

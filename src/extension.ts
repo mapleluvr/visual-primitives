@@ -7,18 +7,21 @@ import {
   cropAroundPointSchema,
   cropBoundingBoxSchema,
   cropMultipleBoundingBoxesSchema,
+  sampleColorsSchema,
   type CropBoundingBoxInput,
+  type SampleColorsInput,
 } from "./schema.ts";
 import {
   annotateBoundingBoxes,
   cropAroundPoint,
   cropMultipleBoundingBoxes,
+  sampleColors,
   type AnnotateBoundingBoxesInput,
   type CropAroundPointInput,
   type CropMultipleBoundingBoxesInput,
 } from "./phase2.ts";
 
-type ToolInput = CropBoundingBoxInput | CropMultipleBoundingBoxesInput | AnnotateBoundingBoxesInput | CropAroundPointInput;
+type ToolInput = CropBoundingBoxInput | CropMultipleBoundingBoxesInput | AnnotateBoundingBoxesInput | CropAroundPointInput | SampleColorsInput;
 
 interface PiLike {
   registerTool(tool: {
@@ -132,6 +135,30 @@ export function registerVisualPrimitives(pi: PiLike | ExtensionAPI, _options: Vi
         content: [{
           type: "text",
           text: `Cropped around point to ${details.outputPath} (left=${details.resolvedPixelBox.left}, top=${details.resolvedPixelBox.top}, width=${details.resolvedPixelBox.width}, height=${details.resolvedPixelBox.height})`,
+        }],
+        details,
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "sample_colors",
+    label: "Sample Colors",
+    description: "Sample exact colors at provided image points for CSS-level color precision and visual evidence.",
+    promptSnippet: "Sample exact RGB, hex, OKLab, and patch mean colors from user- or agent-provided points in an image or screenshot.",
+    promptGuidelines: [
+      "Use sample_colors when color-sensitive visual analysis needs exact values for CSS-level color precision.",
+      "Sample only provided points; choose points from direct visual inspection, annotations, crops, or user instructions.",
+      "Use a small odd patchSize such as 3 or 5 when antialiasing, gradients, or texture make a single pixel misleading.",
+      "This tool does not detect palettes, dominant colors, objects, or regions automatically.",
+    ],
+    parameters: sampleColorsSchema,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      const details = await sampleColors(params as SampleColorsInput, { cwd: ctx?.cwd ?? process.cwd(), signal });
+      return {
+        content: [{
+          type: "text",
+          text: `Sampled ${details.samples.length} color${details.samples.length === 1 ? "" : "s"}: ${details.samples.map((sample) => `${sample.label ?? `point-${sample.index + 1}`}: ${sample.hex}`).join(", ")}`,
         }],
         details,
       };

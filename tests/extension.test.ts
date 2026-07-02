@@ -94,10 +94,12 @@ test("registerVisualPrimitives registers visual primitive helper tools", () => {
     "crop_multiple_bounding_boxes",
     "annotate_bounding_boxes",
     "crop_around_point",
+    "sample_colors",
   ]);
   assert.match(tools[1].description, /multiple regions/);
   assert.match(tools[2].description, /annotated preview/);
   assert.match(tools[3].description, /point of interest/);
+  assert.match(tools[4].description, /exact colors/);
 });
 
 test("registered tools guide proactive visual evidence workflows", () => {
@@ -106,11 +108,13 @@ test("registered tools guide proactive visual evidence workflows", () => {
   const multi = tools.find((candidate) => candidate.name === "crop_multiple_bounding_boxes");
   const annotate = tools.find((candidate) => candidate.name === "annotate_bounding_boxes");
   const point = tools.find((candidate) => candidate.name === "crop_around_point");
+  const colors = tools.find((candidate) => candidate.name === "sample_colors");
 
   assert.ok(crop);
   assert.ok(multi);
   assert.ok(annotate);
   assert.ok(point);
+  assert.ok(colors);
 
   assert.match(`${crop.description} ${crop.promptSnippet} ${crop.promptGuidelines?.join(" ")}`, /screenshot/i);
   assert.match(`${crop.description} ${crop.promptSnippet} ${crop.promptGuidelines?.join(" ")}`, /UI reproduction|visual QA/i);
@@ -125,6 +129,9 @@ test("registered tools guide proactive visual evidence workflows", () => {
 
   assert.match(`${point.description} ${point.promptSnippet} ${point.promptGuidelines?.join(" ")}`, /point of interest/i);
   assert.match(`${point.description} ${point.promptSnippet} ${point.promptGuidelines?.join(" ")}`, /alignment issue|overlap/i);
+
+  assert.match(`${colors.description} ${colors.promptSnippet} ${colors.promptGuidelines?.join(" ")}`, /CSS-level color precision/i);
+  assert.match(`${colors.description} ${colors.promptSnippet} ${colors.promptGuidelines?.join(" ")}`, /provided points/i);
 });
 
 test("crop_bounding_box execution returns crop result details", async () => {
@@ -139,6 +146,39 @@ test("crop_bounding_box execution returns crop result details", async () => {
     }, undefined, undefined, { cwd: "/tmp" }),
     /does not exist|cannot be read|Input file is missing/,
   );
+});
+
+test("sample_colors execution returns exact color details", async () => {
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const sharp = (await import("sharp")).default;
+
+  const dir = await mkdtemp(join(tmpdir(), "pi-visual-primitives-ext-colors-test-"));
+  try {
+    const source = join(dir, "source.png");
+    const data = Buffer.from([
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+      0, 0, 255, 255,
+      255, 255, 255, 255,
+    ]);
+    await sharp(data, { raw: { width: 2, height: 2, channels: 4 } }).png().toFile(source);
+
+    const tool = registeredTools().find((candidate) => candidate.name === "sample_colors");
+    assert.ok(tool);
+    const result = await tool.execute("call-colors", {
+      imagePath: source,
+      points: [{ label: "red", point: [0, 0] }],
+      coordinateSpace: "pixel",
+    }, undefined, undefined, { cwd: dir });
+
+    assert.match(result.content[0].text, /Sampled 1 color/);
+    assert.match(result.content[0].text, /red: #ff0000/);
+    assert.equal((result.details as any).samples[0].hex, "#ff0000");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("crop_bounding_box result text includes output and resolved pixel box", async () => {

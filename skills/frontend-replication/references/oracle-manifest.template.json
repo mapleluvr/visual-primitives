@@ -1,0 +1,19 @@
+{
+  "runId": "<run-id>",
+  "viewport": { "width": 1440, "height": 900, "deviceScaleFactor": 1 },
+  "oraclePairs": [
+    {
+      "id": "oracle-001",
+      "oraclePicture": "oracles/oracle-001.png",
+      "description": "oracles/oracle-001.md",
+      "descriptionSource": "user-provided-and-derived",
+      "evidence": []
+    }
+  ],
+  "constraints": {
+    "stack": "project default",
+    "allowedAssets": [],
+    "allowedLibraries": [],
+    "implementationScope": "current user request"
+  }
+}

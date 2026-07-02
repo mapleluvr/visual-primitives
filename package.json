@@ -7,8 +7,9 @@
   "author": "mapleluvr",
   "license": "MIT",
   "scripts": {
-    "check": "node --experimental-strip-types --check index.ts && node --experimental-strip-types --check src/schema.ts && node --experimental-strip-types --check src/crop.ts && node --experimental-strip-types --check src/phase2.ts && node --experimental-strip-types --check src/extension.ts",
-    "test": "node --experimental-strip-types --test tests/*.test.ts"
+    "check": "node --experimental-strip-types --check index.ts && node --experimental-strip-types --check src/schema.ts && node --experimental-strip-types --check src/crop.ts && node --experimental-strip-types --check src/phase2.ts && node --experimental-strip-types --check src/extension.ts && node --experimental-strip-types --check scripts/masked-oracle-diff.ts",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "oracle:diff": "node --experimental-strip-types scripts/masked-oracle-diff.ts"
   },
   "dependencies": {
     "sharp": "^0.34.0"

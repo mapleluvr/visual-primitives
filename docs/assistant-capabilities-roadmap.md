@@ -1,8 +1,15 @@
 # Assistant Capabilities Roadmap
 
-This document captures assistant-facing capability plans for `pi-visual-primitives`. The package now exposes runtime tools for cropping one box, batch-cropping provided boxes, annotating provided boxes, and cropping around explicit points. The package does not generate bounding boxes; it helps an agent turn provided coordinates into local image artifacts for follow-up inspection.
+This document captures assistant-facing capability plans for `pi-visual-primitives`. The package now exposes runtime tools for cropping one box, batch-cropping provided boxes, annotating provided boxes, cropping around explicit points, and sampling colors at provided points. The package does not generate bounding boxes; it helps an agent turn provided coordinates into local image artifacts or numeric evidence for follow-up inspection.
 
 ## Recommendation Summary
+
+Tool boundary decisions from the 2026-07-02 review:
+
+- `overlay_grid` is rejected because direct coordinate perception is already accurate enough and grid overlays can obscure source pixels.
+- `measure_distance` is rejected as a tool because distance, gap, offset, ratio, and alignment are second-order quantities; agents should write coordinates and compute the arithmetic explicitly.
+- `sample_colors` is approved because exact CSS color values are a structural VLM weakness and should be sampled from provided points.
+- Tools turn coordinates into visual artifacts or coordinates into numeric evidence. They do not infer coordinates from images.
 
 Priority order:
 
@@ -10,26 +17,32 @@ Priority order:
 2. **Auxiliary tools implemented.** Batch crop, annotation preview, and point crop workflows are now first-class tools.
 3. **Add UI interaction later.** Interactive flows are useful, but should wait until repeated user need justifies the added complexity.
 
-The original gap was not image processing capability alone; it was agent reliability. The package now combines a Skill for coordinate decision-making with small composable tools for repeated crop and verification workflows.
+The original gap was not image processing capability alone; it was agent reliability. The package now combines a visual evidence Skill Set with small composable tools for repeated crop, annotation, comparison, and verification workflows.
 
-## Phase 1: Real Pi Skill Package
+## Phase 1: Real Pi Skill Set
 
 ### Status
 
-Implemented in this package at:
+Implemented in this package under:
 
 ```text
-skills/visual-primitives/SKILL.md
+skills/
 ```
 
-The package manifest exposes both:
+Core entries include:
 
-- the extension tool: `crop_bounding_box`
-- the on-demand Skill: `visual-primitives`
+- `skills/using-visual-primitives/SKILL.md`
+- `skills/frontend-replication/SKILL.md`
+- `skills/inline-replication/SKILL.md`
+- `skills/subagent-driven-replication/SKILL.md`
+- `skills/refining-with-feedback/SKILL.md`
+- `skills/finalizing-replication/SKILL.md`
+
+The package manifest exposes the extension tools and the Skill Set directory.
 
 ### Goal
 
-Maintain a real Pi Skill package that teaches agents how to use `crop_bounding_box` correctly for visual-primitive workflows.
+Maintain a real Pi Skill Set that teaches agents how to use visual evidence tools for marking, cropping, comparing, aligning, analyzing images, and frontend replication workflows.
 
 ### Why this comes first
 
@@ -95,8 +108,9 @@ Implemented in this package as runtime tools:
 - `crop_multiple_bounding_boxes`
 - `annotate_bounding_boxes`
 - `crop_around_point`
+- `sample_colors`
 
-These tools reuse the same coordinate-space, origin, box-order, padding, and clamping conventions as `crop_bounding_box`.
+These tools reuse the same coordinate-space and origin conventions as `crop_bounding_box` where applicable.
 
 Auxiliary tools should stay small and composable rather than becoming a full image-annotation suite.
 
@@ -183,6 +197,24 @@ Suggested policy implemented:
 - Require explicit crop size or radius.
 - Do not invent a default size in the tool.
 
+### Implemented: `sample_colors`
+
+Purpose:
+
+- Sample exact colors at provided points or small patches.
+- Return RGB, hex, OKLab, patch size, sampled pixel count, and patch mean hex values.
+
+Benefits:
+
+- Supports CSS-level color precision that VLMs cannot reliably infer by sight.
+- Keeps color evidence tied to explicit user- or agent-selected coordinates.
+
+Implementation notes:
+
+- Reuse existing path, coordinate-space, and origin conventions.
+- Read pixels through `sharp` raw buffers.
+- Keep the tool point-based; it does not detect palettes, dominant colors, or regions automatically.
+
 ### Deferred candidates
 
 These are not recommended until the package has more usage data:
@@ -261,14 +293,15 @@ Suggested policy:
 
 ## Recommended Implementation Sequence
 
-1. Maintain and refine `skills/visual-primitives/SKILL.md` based on real agent usage.
+1. Maintain and refine the Skill Set under `skills/`, especially `skills/using-visual-primitives/SKILL.md`, based on real agent usage.
 2. Keep `package.json` exposing both extension and Skill resources.
 3. Keep documentation examples showing the Skill plus all visual-primitive tools.
 4. Observe real usage and identify repeated multi-crop, verification, or point-crop workflows.
 5. Refine `crop_multiple_bounding_boxes` if partial-result behavior becomes necessary.
 6. Refine `annotate_bounding_boxes` only when real workflows need additional styling controls.
 7. Refine `crop_around_point` only when point-based primitive workflows need more options.
-8. Revisit `/visual-crop` or a wizard only after the command would clearly reduce repeated user friction.
+8. Refine `sample_colors` only when color sampling workflows need additional patch or color-space reporting.
+9. Revisit `/visual-crop` or a wizard only after the command would clearly reduce repeated user friction.
 
 ## Non-Goals
 
