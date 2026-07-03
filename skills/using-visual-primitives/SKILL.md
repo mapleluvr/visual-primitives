@@ -9,7 +9,7 @@ description: Use when marking, comparing, aligning, analyzing, cropping, annotat
 
 Use this Skill when an image task needs visual evidence. `pi-visual-primitives` tools turn concrete regions and points into artifacts you can inspect: annotated images, single crops, batch crops, and point-centered crops.
 
-This Skill is the general-purpose visual evidence layer. It supports standalone image proofreading, screenshot comparison, chart alignment, generated image analysis, UI render inspection, and local region study.
+This Skill is the general-purpose visual evidence layer. It supports standalone image proofreading, screenshot comparison, layout comparison, spacing checks, edge alignment, text baseline analysis, chart alignment, generated image analysis, UI render inspection, masked diff triage, color verification, and local region study.
 
 ## Core Principles
 
@@ -22,10 +22,13 @@ This Skill is the general-purpose visual evidence layer. It supports standalone 
 Use this Skill for:
 
 - marking images with labeled boxes;
+- turning a region hypothesis into visible evidence;
 - comparing images or screenshots;
+- checking layout comparison, spacing, edge alignment, text baselines, and nearby anchors;
 - aligning images through corresponding regions;
-- analyzing local image details;
-- checking UI renders, charts, generated images, diagrams, product photos, or visual artifacts;
+- analyzing local image details, including masked diff components and stripe-like findings;
+- checking UI renders, charts, generated images, diagrams, product photos, or visual QA artifacts;
+- verifying shadow mismatch, gradient behavior, palette-sensitive colors, and contrast-sensitive local areas;
 - converting visual impressions into pixel or normalized coordinates;
 - verifying that a crop or annotation actually covers the intended local content.
 
@@ -35,13 +38,13 @@ Do not use this Skill for pure style advice without an image or visual artifact.
 
 | Need | Tool |
 | --- | --- |
-| Marking images with visible boxes | `annotate_bounding_boxes` |
+| Marking images with visible boxes or testing a region hypothesis | `annotate_bounding_boxes` |
 | Checking one region closely | `crop_bounding_box` |
 | Checking several regions from one source | `crop_multiple_bounding_boxes` |
-| Comparing corresponding regions | `annotate_bounding_boxes`, then `crop_multiple_bounding_boxes` |
-| Aligning images | matching annotations, shared labels, and comparable coordinates |
-| Analyzing a point defect | `crop_around_point` with explicit `radius` or `size` |
-| Sampling exact colors | `sample_colors` at explicit points |
+| Comparing corresponding regions across screenshots or variants | `annotate_bounding_boxes`, then `crop_multiple_bounding_boxes` |
+| Layout comparison, spacing, edge alignment, or text baseline checks | matching annotations, shared labels, comparable coordinates, and `resolvedPixelBox` arithmetic |
+| Inspecting a masked diff component, localized highlight, tiny overlap, cursor target, or label anchor | `crop_around_point` with explicit `radius` or `size` |
+| Investigating shadow mismatch, gradient behavior, palette-sensitive areas, or CSS-level color claims | `sample_colors` at explicit points, supported by crops around the sampled area |
 
 For screenshots and rendered UI, prefer `coordinateSpace: "pixel"`, `origin: "top-left"`, and `boxOrder: "left-top-right-bottom"`. Use `normalized-999` when coordinates come from visual-primitives style normalized values.
 

@@ -2,9 +2,9 @@
 
 Pi Visual Primitives is a Pi extension package that gives agents visual evidence workflow helper tools. Use it for tasks involving images, screenshots, rendered UI, reference designs, visual effects, frontend visual reproduction, visual comparison, or visual QA when the agent needs to draw conclusions from visual appearance.
 
-Coordinates are not the trigger. A need for visual evidence is the trigger. The package creates local crop and annotation artifacts that agents can inspect or reuse while reasoning about visuals.
+Visual evidence needs trigger the package. Coordinates are selected, estimated, or provided during the evidence workflow, then turned into local crop, annotation, point-crop, and color-sampling artifacts that agents can inspect or reuse while reasoning about visuals.
 
-The design is inspired by the "Thinking with Visual Primitives" paper overview: points and bounding boxes can act as concrete spatial references during visual reasoning. This package does not generate boxes, detect objects, OCR text, segment images, or infer UI elements automatically. It turns user-provided or agent-estimated regions into local crop or annotation artifacts.
+The design is inspired by the "Thinking with Visual Primitives" paper overview: points and bounding boxes can act as concrete spatial references during visual reasoning. Detection, OCR, segmentation, automatic box generation, and automatic UI inference stay outside the tool contract. The package turns user-provided or agent-estimated regions into local evidence artifacts.
 
 ## Features
 
@@ -57,7 +57,7 @@ This package includes a Pi Skill Set under `skills/`:
 - `skills/refining-with-feedback/SKILL.md` for turning process verdicts into feedback drafts.
 - `skills/finalizing-replication/SKILL.md` for final direct inspection and delivery review.
 
-The legacy single `visual-primitives` Skill entry has been retired. Use `using-visual-primitives` for standalone visual evidence tasks and `frontend-replication` for screenshot-oracle webpage reproduction.
+Use `using-visual-primitives` for standalone visual evidence tasks and `frontend-replication` for screenshot-oracle webpage reproduction.
 
 ## Visual Evidence Workflow Example
 
@@ -160,11 +160,11 @@ Example:
 }
 ```
 
-The tool returns resolved pixel points plus RGB, hex, OKLab, patch size, sampled pixel count, and patch mean hex values. It samples only user- or agent-provided points; it does not detect palettes or dominant colors.
+The tool returns resolved pixel points plus RGB, hex, OKLab, patch size, sampled pixel count, and patch mean hex values. Palette and dominant-color discovery stay outside the point-sampling contract.
 
 ## Tool: `crop_around_point`
 
-Crops a region centered around a provided point. The call must provide either `radius` or `size`; the tool does not invent a default crop size.
+Crops a region centered around a provided point. The call requires an explicit crop size through either `radius` or `size`.
 
 Example with radius:
 

@@ -327,12 +327,12 @@ test("README documents visual evidence workflows and Phase 2 auxiliary tools", a
   assert.match(readme, /screenshots/i);
   assert.match(readme, /frontend visual reproduction/i);
   assert.match(readme, /visual QA/i);
-  assert.match(readme, /Coordinates are not the trigger/i);
+  assert.match(readme, /Visual evidence needs trigger the package/i);
   assert.match(readme, /## Tool: `crop_multiple_bounding_boxes`/);
   assert.match(readme, /## Tool: `annotate_bounding_boxes`/);
   assert.match(readme, /## Tool: `crop_around_point`/);
   assert.match(readme, /fail-fast/i);
-  assert.match(readme, /does not invent a default crop size/i);
+  assert.match(readme, /requires an explicit crop size/i);
 });
 
 test("using-visual-primitives Skill routes helper tool workflows", async () => {
@@ -343,6 +343,21 @@ test("using-visual-primitives Skill routes helper tool workflows", async () => {
   assert.match(skill, /crop_around_point/);
   assert.match(skill, /Tool Selection/i);
   assert.match(skill, /explicit `radius` or `size`/i);
+});
+
+test("using-visual-primitives Skill describes broad tool usage scenarios", async () => {
+  const skill = await readText(join("skills", "using-visual-primitives", "SKILL.md"));
+
+  assert.match(skill, /region hypothesis/i);
+  assert.match(skill, /layout comparison/i);
+  assert.match(skill, /spacing/i);
+  assert.match(skill, /visual QA/i);
+  assert.match(skill, /masked diff component/i);
+  assert.match(skill, /edge alignment/i);
+  assert.match(skill, /text baseline/i);
+  assert.match(skill, /shadow mismatch/i);
+  assert.match(skill, /gradient/i);
+  assert.match(skill, /palette/i);
 });
 
 test("using-visual-primitives Skill documents multi-image proofreading workflow", async () => {
@@ -431,6 +446,21 @@ test("README and roadmap record approved tool boundary decisions", async () => {
   assert.match(roadmap, /sample_colors.*approved/is);
   assert.match(roadmap, /coordinates into visual artifacts/i);
   assert.match(roadmap, /coordinates into numeric evidence/i);
+});
+
+test("README uses positive capability boundaries", async () => {
+  const readme = await readText("README.md");
+
+  assert.match(readme, /Visual evidence needs trigger the package/i);
+  assert.match(readme, /Detection, OCR, segmentation, automatic box generation, and automatic UI inference stay outside the tool contract/i);
+  assert.match(readme, /requires an explicit crop size/i);
+  assert.match(readme, /Palette and dominant-color discovery stay outside the point-sampling contract/i);
+  assert.match(readme, /Use `using-visual-primitives` for standalone visual evidence tasks/i);
+  assert.doesNotMatch(readme, /Coordinates are not the trigger/i);
+  assert.doesNotMatch(readme, /does not generate boxes, detect objects, OCR text, segment images, or infer UI elements automatically/i);
+  assert.doesNotMatch(readme, /The legacy single `visual-primitives` Skill entry has been retired/i);
+  assert.doesNotMatch(readme, /it does not detect palettes or dominant colors/i);
+  assert.doesNotMatch(readme, /does not invent a default crop size/i);
 });
 
 test("roadmap records Phase 2 as implemented while keeping UI deferred", async () => {
