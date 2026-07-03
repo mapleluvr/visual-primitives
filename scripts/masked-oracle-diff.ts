@@ -30,6 +30,7 @@ type DiffOptions = {
   highlightThreshold: number;
   stripeThreshold: number;
   minCellCoverage: number;
+  minComponentArea: number;
 };
 
 type PixelBox = {
@@ -98,6 +99,7 @@ const DEFAULT_OPTIONS: DiffOptions = {
   highlightThreshold: 0.18,
   stripeThreshold: 0.1,
   minCellCoverage: 0.2,
+  minComponentArea: 4,
 };
 
 function round(value: number, digits = 6): number {
@@ -110,6 +112,23 @@ function percentile(values: number[], p: number): number {
   const sorted = [...values].sort((a, b) => a - b);
   const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
   return sorted[index];
+}
+
+function maxValue(values: number[]): number {
+  let max = 0;
+  for (const value of values) {
+    if (value > max) max = value;
+  }
+  return max;
+}
+
+function maxBy<T>(items: T[], getValue: (item: T) => number): number {
+  let max = 0;
+  for (const item of items) {
+    const value = getValue(item);
+    if (value > max) max = value;
+  }
+  return max;
 }
 
 function resolvePath(baseDir: string, value: string): string {
@@ -458,6 +477,8 @@ function computeComponents(width: number, height: number, mask: Uint8Array, diff
       }
     }
 
+    if (area < options.minComponentArea) continue;
+
     const range = matrixRangeForBox([minX, minY, maxX, maxY], width, height, options.gridSize);
     components.push({
       id: components.length + 1,
@@ -695,7 +716,7 @@ export async function runMaskedOracleDiff(input: { manifestPath: string }): Prom
     mean: round(diffImages.scoredValues.reduce((sum, value) => sum + value, 0) / Math.max(1, diffImages.scoredValues.length)),
     p90: round(percentile(diffImages.scoredValues, 90)),
     p95: round(percentile(diffImages.scoredValues, 95)),
-    max: round(diffImages.scoredValues.length === 0 ? 0 : Math.max(...diffImages.scoredValues)),
+    max: round(maxValue(diffImages.scoredValues)),
   };
 
   const summary = {
@@ -706,12 +727,12 @@ export async function runMaskedOracleDiff(input: { manifestPath: string }): Prom
     global,
     components: {
       count: components.length,
-      maxArea: components.length === 0 ? 0 : Math.max(...components.map((component) => component.area)),
-      maxDiff: components.length === 0 ? 0 : round(Math.max(...components.map((component) => component.maxDiff))),
+      maxArea: maxBy(components, (component) => component.area),
+      maxDiff: round(maxBy(components, (component) => component.maxDiff)),
     },
     stripes: {
       count: stripes.length,
-      maxMeanScore: stripes.length === 0 ? 0 : round(Math.max(...stripes.map((stripe) => stripe.meanScore))),
+      maxMeanScore: round(maxBy(stripes, (stripe) => stripe.meanScore)),
     },
     artifacts: {
       gray: "diff.gray.png",

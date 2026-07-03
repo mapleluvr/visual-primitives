@@ -396,6 +396,7 @@ test("frontend replication references publish stable loop contracts", async () =
   assert.match(verdictContract, /fixes worth doing now/i);
   assert.match(maskedDiff, /npm run oracle:diff -- --manifest/);
   assert.match(maskedDiff, /scripts\/diff-manifest\.json/);
+  assert.match(maskedDiff, /minComponentArea/);
   assert.match(screenshotCapture, /same viewport/i);
   assert.match(screenshotCapture, /same pixel dimensions/i);
 });
@@ -461,6 +462,20 @@ test("README uses positive capability boundaries", async () => {
   assert.doesNotMatch(readme, /The legacy single `visual-primitives` Skill entry has been retired/i);
   assert.doesNotMatch(readme, /it does not detect palettes or dominant colors/i);
   assert.doesNotMatch(readme, /does not invent a default crop size/i);
+});
+
+test("README worked examples keep exclusion guidance positive and internally consistent", async () => {
+  const readme = await readText("README.md");
+
+  assert.match(readme, /Render every code-drawable region in code/i);
+  assert.match(readme, /Approved exclusions may be represented by placeholders or delegated image assets/i);
+  assert.match(readme, /Keep code-drawable content inside the scoring domain/i);
+  assert.match(readme, /The NetEase logo mark was left in the code-replication scope/i);
+  assert.match(readme, /dense brand marks can be declared as narrow exclusion candidates/i);
+  assert.doesNotMatch(readme, /Do not use image assets/i);
+  assert.doesNotMatch(readme, /Never exclude code-drawable content/i);
+  assert.doesNotMatch(readme, /should not be asked to paint/i);
+  assert.doesNotMatch(readme, /That is exactly why the workflow treats logos, avatars, and cover art as delegation-and-exclusion candidates/i);
 });
 
 test("roadmap records Phase 2 as implemented while keeping UI deferred", async () => {

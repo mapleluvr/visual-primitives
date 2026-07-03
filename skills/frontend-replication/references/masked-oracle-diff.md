@@ -33,7 +33,8 @@ docs/visual-primitives/runs/<run-id>/scripts/diff-manifest.json
     "localWindow": 11,
     "highlightThreshold": 0.18,
     "stripeThreshold": 0.1,
-    "minCellCoverage": 0.2
+    "minCellCoverage": 0.2,
+    "minComponentArea": 4
   }
 }
 ```
@@ -49,6 +50,7 @@ If input validation blocks scoring, such as mismatched oracle/rendered dimension
 - Masked pixels are opaque neutral dark gray `#303030` and excluded from scoring.
 - Every unmasked pixel is part of the scoring domain.
 - High local brightness in `diff.gray.png` and high matrix cells are inspection targets.
+- `minComponentArea` filters tiny isolated highlight components while preserving larger local differences for inspection.
 - `status: "feedback-required"` means diff evidence found components or stripe-like patterns that should enter process feedback.
 - `status: "direct-inspection-required"` means no script-detected component or stripe blocks final inspection.
 - `status: "blocked"` means inputs must be fixed before scoring can continue.

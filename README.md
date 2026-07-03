@@ -65,6 +65,54 @@ For a prompt like `Recreate this dashboard screenshot and match the spacing`, an
 
 For screenshots and rendered UI, prefer `coordinateSpace: "pixel"` unless the source clearly uses normalized visual-primitive coordinates. For paper-style visual primitive coordinates, use the default `normalized-999` behavior.
 
+## Worked Examples
+
+Frontend is meant to be looked at, so these examples are shown, not scored. Both renders are a single pass by a mid-tier frontend model driven through `frontend-replication` -> `inline-replication`.
+
+These results depend on the workflow actually being followed. The quality comes from running the replication loop, not from the model alone — skip the workflow and let the model free-run, and the output degrades noticeably. A short starting prompt that reliably drives the loop:
+
+```text
+Replicate the frontend screenshot at <path> (viewport <W>x<H>). Follow the
+frontend-replication workflow strictly.
+
+- Match the oracle's exact pixel dimensions in the rendered screenshot.
+- Render every code-drawable region in code (CSS/SVG): text, song/artist names,
+  table columns, icons, badges, status pills, progress bars, and brand colors.
+- Approved exclusions may be represented by placeholders or delegated image assets: avatars, album / cover art, organic illustrations, and dense logo marks.
+- Keep code-drawable content inside the scoring domain; use exclusions only for
+  tightly bounded regions that cannot be described as boxes and paths.
+```
+
+The exclusion boundary is drawn by *what a text model can render*, not by *what is an image*. The code-drawable list keeps structured UI work inside the scoring domain instead of quietly widening exclusions to make the task easier.
+
+### Simple task: fast and accurate
+
+The oracle is an analytics dashboard mockup — a regular layout of a sidebar, a KPI row, two chart cards, and a transactions table.
+
+![Dashboard mockup next to the single-pass render](docs/visual-primitives/examples/pulse-side-by-side.png)
+
+*Left: the oracle mockup. Right: the single-pass render.*
+
+On a clean, regular layout like this the workflow does not even need its feedback loop. The first render matches the oracle closely enough that the two are hard to tell apart at a glance — sidebar, stat cards, the revenue area chart, the traffic donut, and the transactions table with its colored status pills all land in place, with the semantic colors (green up-deltas, red down-deltas, amber pending) reproduced. Simple targets come out fast and accurate in one pass.
+
+### Complex task: a dense real-world screenshot
+
+The oracle is a real NetEase Cloud Music desktop screenshot (`1448x940`) — a much harder target: a three-region client with dozens of code-drawable icons, badge systems (`超清母带`, `VIP`), a brand-specific red, multi-size Chinese typography, right-aligned table columns, and a floating progress bar.
+
+![NetEase screenshot next to the single-pass render](docs/visual-primitives/examples/netease-side-by-side.png)
+
+*Left: the real screenshot used as the oracle. Right: the single-pass render. Full-resolution copies of every example are under [`docs/visual-primitives/examples/`](docs/visual-primitives/examples/).*
+
+Six regions were **delegated out of the code-replication scope** as exclusions rather than reproduced by the text model — the playlist cover art, two avatars, two track thumbnails, and the rotating vinyl. The workflow delegates organic, imagination-driven imagery to image assets or placeholders, while keeping structured UI content in the code-scored domain.
+
+Even at this density the single-pass render holds together — the layout skeleton, table alignment, badge system, brand red, and icon glyphs all reproduce closely enough that the remaining differences take focused inspection to find. What is visible on close viewing is small-area detail rather than layout failure:
+
+- The **NetEase logo mark** is only approximated — the render draws a rough glyph inside the red circle instead of the precise headphone/note mark, and its size and weight are slightly off.
+- The **progress-bar knob** sits a few pixels high of the red/gray boundary instead of centered on it.
+- A handful of icons differ by a font-weight step.
+
+The NetEase logo mark was left in the code-replication scope for this run, so its rough SVG approximation remains a visible limitation. In stricter production runs, dense brand marks can be declared as narrow exclusion candidates alongside avatars and cover art. The scoring domain is reserved for structured UI details a text model can describe and render accurately.
+
 ## Masked Oracle Diff CLI
 
 `masked-oracle-diff` compares an oracle image and rendered image while excluding narrowly justified non-code-drawable regions. Everything outside the exclusion boxes is scored.

@@ -157,6 +157,83 @@ test("masked-oracle-diff writes artifacts and excludes masked pixels from scorin
   });
 });
 
+test("masked-oracle-diff handles large same-size images without spread overflow", async () => {
+  await withTempDir(async (dir) => {
+    const oracle = join(dir, "oracle.png");
+    const rendered = join(dir, "rendered.png");
+    const manifest = join(dir, "manifest.json");
+    const outputDir = join(dir, "diff-output");
+
+    await writeFixturePng(oracle, 512, 512);
+    await writeFixturePng(rendered, 512, 512);
+    await writeFile(manifest, JSON.stringify({
+      oracleImage: "oracle.png",
+      renderedImage: "rendered.png",
+      outputDir: "diff-output",
+      coordinateSpace: "pixel",
+      exclusionBoxes: [],
+      options: {
+        diffColorSpace: "rgb",
+        highlightThreshold: 0.1,
+        stripeThreshold: 0.1,
+      },
+    }, null, 2));
+
+    const { runMaskedOracleDiff } = await import("../scripts/masked-oracle-diff.ts");
+    await runMaskedOracleDiff({ manifestPath: manifest });
+
+    const summary = await readJson(join(outputDir, "summary.json"));
+    assert.equal(summary.scoredPixels, 512 * 512);
+    assert.equal(summary.global.max, 0);
+    assert.equal(summary.status, "direct-inspection-required");
+  });
+});
+
+test("masked-oracle-diff filters tiny noise components while preserving larger local differences", async () => {
+  await withTempDir(async (dir) => {
+    const oracle = join(dir, "oracle.png");
+    const rendered = join(dir, "rendered.png");
+    const manifest = join(dir, "manifest.json");
+    const outputDir = join(dir, "diff-output");
+
+    await writeFixturePng(oracle, 24, 24);
+    await writeFixturePng(rendered, 24, 24, (buffer) => {
+      fillRect(buffer, 24, 2, 2, 3, 3, [0, 0, 0, 255]);
+      fillRect(buffer, 24, 10, 10, 13, 13, [0, 0, 0, 255]);
+    });
+    await writeFile(manifest, JSON.stringify({
+      oracleImage: "oracle.png",
+      renderedImage: "rendered.png",
+      outputDir: "diff-output",
+      coordinateSpace: "pixel",
+      exclusionBoxes: [],
+      options: {
+        gridSize: 6,
+        diffColorSpace: "rgb",
+        highlightThreshold: 0.1,
+        stripeThreshold: 0.1,
+        minComponentArea: 4,
+      },
+    }, null, 2));
+
+    const { runMaskedOracleDiff } = await import("../scripts/masked-oracle-diff.ts");
+    await runMaskedOracleDiff({ manifestPath: manifest });
+
+    const components = await readJson(join(outputDir, "components.json"));
+    assert.equal(components.components.length, 1);
+    assert.deepEqual(components.components[0].bbox, [10, 10, 13, 13]);
+    assert.equal(components.components[0].area, 9);
+
+    const summary = await readJson(join(outputDir, "summary.json"));
+    assert.equal(summary.components.count, 1);
+    assert.equal(summary.components.maxArea, 9);
+
+    const verdict = await readFile(join(outputDir, "VERDICT.md"), "utf8");
+    assert.match(verdict, /bbox 10,10,13,13/);
+    assert.doesNotMatch(verdict, /bbox 2,2,3,3/);
+  });
+});
+
 test("masked-oracle-diff writes blocked summary and verdict for dimension mismatch", async () => {
   await withTempDir(async (dir) => {
     const oracle = join(dir, "oracle.png");
