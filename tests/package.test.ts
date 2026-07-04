@@ -39,6 +39,28 @@ test("README documents package installation so the Skill is loaded", async () =>
   assert.match(readme, /loads both the extension tool and the Skill/);
 });
 
+test("README links to a Chinese translation with matching core guidance", async () => {
+  const readme = await readText("README.md");
+  const zhReadme = await readText("README.zh-CN.md");
+
+  assert.match(readme, /\[中文\]\(README\.zh-CN\.md\)/);
+  assert.match(zhReadme, /\[English\]\(README\.md\)/);
+  assert.match(zhReadme, /视觉证据/);
+  assert.match(zhReadme, /技能集/);
+  assert.match(zhReadme, /Worked Examples|完整示例|示例/);
+  assert.match(zhReadme, /docs\/visual-primitives\/examples\/pulse-side-by-side\.png/);
+  assert.match(zhReadme, /docs\/visual-primitives\/examples\/netease-side-by-side\.png/);
+  assert.match(zhReadme, /masked-oracle-diff/);
+  assert.match(zhReadme, /npm run oracle:diff/);
+  assert.match(zhReadme, /crop_bounding_box/);
+  assert.match(zhReadme, /sample_colors/);
+  assert.match(zhReadme, /用代码渲染所有可代码绘制区域/);
+  assert.match(zhReadme, /批准的排除区域可以用占位图或委托图像资产表示/);
+  assert.match(zhReadme, /让可代码绘制内容留在评分域/);
+  assert.doesNotMatch(zhReadme, /不要使用图像资产/);
+  assert.doesNotMatch(zhReadme, /永远不要排除/);
+});
+
 test("legacy visual-primitives Skill entry is retired", async () => {
   await assert.rejects(
     () => readText(join("skills", "visual-primitives", "SKILL.md")),

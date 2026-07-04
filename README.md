@@ -1,5 +1,7 @@
 # Pi Visual Primitives
 
+[中文](README.zh-CN.md)
+
 Pi Visual Primitives is a Pi extension package that gives agents visual evidence workflow helper tools. Use it for tasks involving images, screenshots, rendered UI, reference designs, visual effects, frontend visual reproduction, visual comparison, or visual QA when the agent needs to draw conclusions from visual appearance.
 
 Visual evidence needs trigger the package. Coordinates are selected, estimated, or provided during the evidence workflow, then turned into local crop, annotation, point-crop, and color-sampling artifacts that agents can inspect or reuse while reasoning about visuals.
