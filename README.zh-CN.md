@@ -321,3 +321,7 @@ npm run check
 ```
 
 测试使用 `sharp.create()` 生成临时 PNG fixture，因此仓库不需要额外的二进制测试 fixture。
+
+## 许可证
+
+MIT

@@ -323,3 +323,7 @@ npm run check
 ```
 
 The tests generate temporary PNG fixtures with `sharp.create()`, so the repository does not need binary fixture images.
+
+## License
+
+MIT
