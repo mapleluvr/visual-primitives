@@ -69,9 +69,9 @@ pi install ./pi-visual-primitives
 
 ## 完整示例
 
-前端作品需要被直接观看，所以这些示例展示结果，而不是只给分数。两组 render 都是一个中档前端模型在 `frontend-replication` -> `inline-replication` 驱动下完成的一次性输出。
+前端是用来看的。两组 render 都是一个中档前端模型（GPT 5.5）在 `frontend-replication` -> `inline-replication` 驱动下完成的一次性输出。
 
-这些结果依赖工作流被真正执行。质量来自复现循环，而不是单靠模型自由发挥。一个可靠触发该循环的起始 prompt：
+这些结果依赖工作流被真正执行。经过A/B实验可以发现工作流对于复现以下结果来说，是非常必要的。使用的Prompt示例：
 
 ```text
 Replicate the frontend screenshot at <path> (viewport <W>x<H>). Follow the
@@ -85,7 +85,7 @@ frontend-replication workflow strictly.
   tightly bounded regions that cannot be described as boxes and paths.
 ```
 
-排除边界由“文本模型能渲染什么”决定，而不是由“什么看起来像图片”决定。用代码渲染所有可代码绘制区域；让可代码绘制内容留在评分域。批准的排除区域可以用占位图或委托图像资产表示。
+排除边界由“文本模型用代码渲染什么”决定。用代码渲染所有可代码绘制区域，让可代码绘制的区域被用于工作流内自评估完成度。批准的排除区域可以用占位图或委托图像资产表示。
 
 ### 简单任务：快速且准确
 
