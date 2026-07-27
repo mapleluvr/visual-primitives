@@ -89,15 +89,15 @@ Before masked diff, write a run-local manifest such as:
 scripts/diff-manifest.json
 ```
 
-Run:
+Resolve `scripts/run-masked-oracle-diff.mjs` relative to the loaded `frontend-replication` Skill directory, then run the package-local helper from any project working directory:
 
 ```bash
-npm run oracle:diff -- --manifest docs/visual-primitives/runs/<run-id>/scripts/diff-manifest.json
+node <frontend-replication-skill-dir>/scripts/run-masked-oracle-diff.mjs --manifest docs/visual-primitives/runs/<run-id>/scripts/diff-manifest.json
 ```
 
 Store diff outputs under `diffs/`. Cite `VERDICT.md`, `summary.json`, `matrix.json`, `components.json`, and `stripes.json` in process findings under `verdict/`.
 
-When `components.json` reports local highlights, inspect each important component center with `crop_around_point` before explaining the difference. Use second-order coordinate calculations for offsets, gaps, sizes, and alignment, and use `sample_colors` when the component suggests a color, contrast, gradient, or shadow mismatch.
+When `components.json` reports local highlights, inspect each important component center with `vp point` before explaining the difference. Use second-order coordinate calculations for offsets, gaps, sizes, and alignment, and use `vp colors` when the component suggests a color, contrast, gradient, or shadow mismatch.
 
 ## Verdict And Feedback
 

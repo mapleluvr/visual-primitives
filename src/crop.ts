@@ -154,6 +154,9 @@ function resolvePixelBox(
   }
 
   const resolvedPixelBox = options.clamp ? clampBox(unclampedPixelBox, image) : unclampedPixelBox;
+  if (options.clamp && (resolvedPixelBox.width <= 0 || resolvedPixelBox.height <= 0)) {
+    throw new Error(`box resolves to pixel rect [${unclampedPixelBox.left}, ${unclampedPixelBox.top}, ${unclampedPixelBox.right}, ${unclampedPixelBox.bottom}], completely outside the ${image.width}x${image.height} image`);
+  }
   assertPositiveArea(resolvedPixelBox);
 
   return {
@@ -164,14 +167,14 @@ function resolvePixelBox(
   };
 }
 
-function defaultOutputPath(imagePath: string, input: CropBoundingBoxInput): string {
+function defaultOutputPath(imagePath: string, input: CropBoundingBoxInput, cwd: string): string {
   const parsedExt = extname(imagePath);
   const base = basename(imagePath, parsedExt);
   const hash = createHash("sha256")
     .update(JSON.stringify({ imagePath, input }))
     .digest("hex")
     .slice(0, 12);
-  return join(dirname(imagePath), `${base}.crop-${hash}.png`);
+  return join(cwd, `${base}.crop-${hash}.png`);
 }
 
 export async function resolveCropBoundingBoxDetails(
@@ -204,6 +207,7 @@ export async function resolveCropBoundingBoxDetails(
       width: metadata.width,
       height: metadata.height,
       format: metadata.format,
+      ...(metadata.orientation !== undefined ? { orientation: metadata.orientation } : {}),
     },
     input: {
       box: input.box,
@@ -224,7 +228,7 @@ export async function cropBoundingBox(
   options: CropBoundingBoxOptions,
 ): Promise<CropBoundingBoxDetails> {
   if (options.signal?.aborted) {
-    throw new Error("crop_bounding_box was cancelled");
+    throw new Error("crop was cancelled");
   }
 
   const imagePath = normalizeToolPath(input.imagePath, options.cwd);
@@ -236,14 +240,14 @@ export async function cropBoundingBox(
 
   const outputPath = input.outputPath
     ? normalizeToolPath(input.outputPath, options.cwd)
-    : defaultOutputPath(imagePath, input);
+    : defaultOutputPath(imagePath, input, options.cwd);
 
   const details = await resolveCropBoundingBoxDetails(input, options, outputPath);
 
   await mkdir(dirname(outputPath), { recursive: true });
 
   if (options.signal?.aborted) {
-    throw new Error("crop_bounding_box was cancelled");
+    throw new Error("crop was cancelled");
   }
 
   await sharp(imagePath)

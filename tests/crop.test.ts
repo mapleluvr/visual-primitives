@@ -7,7 +7,7 @@ import sharp from "sharp";
 import { cropBoundingBox, resolvePixelBoxForTest } from "../src/crop.ts";
 
 async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
-  const dir = await mkdtemp(join(tmpdir(), "pi-visual-primitives-test-"));
+  const dir = await mkdtemp(join(tmpdir(), "visual-primitives-test-"));
   try {
     await fn(dir);
   } finally {

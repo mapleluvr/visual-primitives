@@ -7,146 +7,74 @@ description: Use when marking, comparing, aligning, analyzing, cropping, annotat
 
 ## Overview
 
-Use this Skill when an image task needs visual evidence. `pi-visual-primitives` tools turn concrete regions and points into artifacts you can inspect: annotated images, single crops, batch crops, and point-centered crops.
+Use `vp` when an image task needs inspectable visual evidence from agent- or user-provided boxes and points. The five commands annotate images, crop regions, crop several regions, crop around a point, and sample exact colors. They do not detect objects, read text, segment images, or infer UI elements.
 
-This Skill is the general-purpose visual evidence layer. It supports standalone image proofreading, screenshot comparison, layout comparison, spacing checks, edge alignment, text baseline analysis, chart alignment, generated image analysis, UI render inspection, masked diff triage, color verification, and local region study.
+Direct visual inspection remains the interpreter: inspect generated images before making detailed claims.
 
-## Core Principles
+## Invocation
 
-1. **User requirements take priority.** If user instructions specify what to inspect, compare, ignore, crop, annotate, or conclude, follow those requirements before default heuristics.
-2. **Direct visual inspection takes priority.** CV or script-derived conclusions can provide useful evidence, but they are not universally interpretable and can be misleading. Inspect the actual images, annotated outputs, crop outputs, and overlays before making visual claims.
-3. **Think geometrics, write coordinates.** Use repeated `appearance -> coordinates -> appearance` loops: observe the visual impression, express the relevant local geometry as coordinates, inspect the crop or annotation, then refine both the coordinates and the interpretation. The goal is understanding specific local image content at specific positions.
+Agent execution must not assume that `vp` is on `PATH`. Resolve the package root from this Skill's installed location, then invoke the package-local launcher:
 
-## When to Use
+```bash
+node <package-root>/skills/_shared/run-vp.mjs <command> [arguments]
+```
 
-Use this Skill for:
+A user who installed the npm binary globally may use `vp` in place of the launcher. Successful commands print JSON to stdout and write PNG artifacts to the reported paths.
 
-- marking images with labeled boxes;
-- turning a region hypothesis into visible evidence;
-- comparing images or screenshots;
-- checking layout comparison, spacing, edge alignment, text baselines, and nearby anchors;
-- aligning images through corresponding regions;
-- analyzing local image details, including masked diff components and stripe-like findings;
-- checking UI renders, charts, generated images, diagrams, product photos, or visual QA artifacts;
-- verifying shadow mismatch, gradient behavior, palette-sensitive colors, and contrast-sensitive local areas;
-- converting visual impressions into pixel or normalized coordinates;
-- verifying that a crop or annotation actually covers the intended local content.
+## Command Selection
 
-Do not use this Skill for pure style advice without an image or visual artifact. Do not claim the tools detect objects, OCR text, segment images, or infer UI elements automatically.
-
-## Tool Selection
-
-| Need | Tool |
+| Need | Command |
 | --- | --- |
-| Marking images with visible boxes or testing a region hypothesis | `annotate_bounding_boxes` |
-| Checking one region closely | `crop_bounding_box` |
-| Checking several regions from one source | `crop_multiple_bounding_boxes` |
-| Comparing corresponding regions across screenshots or variants | `annotate_bounding_boxes`, then `crop_multiple_bounding_boxes` |
-| Layout comparison, spacing, edge alignment, or text baseline checks | matching annotations, shared labels, comparable coordinates, and `resolvedPixelBox` arithmetic |
-| Inspecting a masked diff component, localized highlight, tiny overlap, cursor target, or label anchor | `crop_around_point` with explicit `radius` or `size` |
-| Investigating shadow mismatch, gradient behavior, palette-sensitive areas, or CSS-level color claims | `sample_colors` at explicit points, supported by crops around the sampled area |
+| Mark boxes and labels on the source image | `vp annotate` |
+| Inspect one rectangular region | `vp crop` |
+| Inspect several regions from one source | `vp crop-multi` |
+| Inspect a local area centered on a point | `vp point` |
+| Sample exact colors at explicit points | `vp colors` |
 
-For screenshots and rendered UI, prefer `coordinateSpace: "pixel"`, `origin: "top-left"`, and `boxOrder: "left-top-right-bottom"`. Use `normalized-999` when coordinates come from visual-primitives style normalized values.
+For screenshots, prefer `--space pixel --origin top-left --box-order left-top-right-bottom`. Use `--space normalized-999` when coordinates are normalized thousandths. Flag mode defaults to pixels; JSON compatibility mode preserves normalized-999 defaults.
 
-## Marking Images
+## Common Invocations
 
-1. Identify the visual question and the source image.
-2. Estimate or use provided boxes for the relevant local regions.
-3. Use `annotate_bounding_boxes` with semantic labels.
-4. Directly inspect the annotated image.
-5. If a box is off-target, too broad, too tight, or ambiguous, revise the coordinates and annotate again.
-6. Record the final labels and coordinates.
+Use the package-local launcher prefix shown above for agent execution. The shorter `vp` form below shows the command arguments:
 
-Good labels name the visual role: `header`, `legend`, `left-card`, `button-shadow`, `chart-axis`, `logo-mark`, `error-highlight`, or `painted-figure`.
+```bash
+vp annotate screenshot.png --space pixel --box "header:40,30,240,180" --out header-annotated.png
+vp crop screenshot.png --space pixel --box "40,30,240,180" --out header-crop.png
+vp crop-multi screenshot.png --space pixel --box "header:40,30,240,180" --box "button:280,220,420,280" --out-dir crops
+vp point screenshot.png --space pixel --point "80,50" --radius 30 --out point-crop.png
+vp colors screenshot.png --space pixel --point "header-bg:80,50" --patch 3
+```
 
-## Verifying Marks With Crops
+Run `node <package-root>/skills/_shared/run-vp.mjs <command> --help` for the complete flags and JSON input shape.
 
-Annotations show placement, but crops prove whether a region contains the intended content at useful precision.
+## Evidence Workflow
 
-After marking, use `crop_bounding_box` or `crop_multiple_bounding_boxes` with the same coordinates. Inspect each crop and confirm:
+1. Identify the visual question and source image.
+2. Estimate or use supplied coordinates.
+3. Run `vp annotate` with semantic labels such as `header`, `legend`, or `button-shadow`.
+4. Inspect the annotated PNG and revise off-target boxes.
+5. Run `vp crop` or `vp crop-multi` with the confirmed coordinates.
+6. Inspect each crop and verify that it contains the intended content without meaningful clamping.
+7. Use `vp point` for a small point-centered area and `vp colors` when a color claim needs exact RGB, hex, OKLab, or patch means.
+8. Record source paths, artifact paths, coordinates, coordinate conventions, and direct observations.
 
-- the intended element is fully included;
-- unrelated surrounding content is not meaningfully included;
-- the crop is not empty or clamped in a way that changes the claim;
-- the crop supports the visual conclusion being made.
+For two or more images, reuse labels and coordinate frames. Annotate each image, crop corresponding regions, then compare the artifacts directly.
 
-## Comparing Images
+## Second-Order Quantities
 
-For two or more images:
+Distance, gap, size difference, alignment offset, and ratio must be computed from independently estimated coordinates. Write the arithmetic explicitly, for example:
 
-1. Choose corresponding regions in each image.
-2. Use the same labels across images.
-3. Annotate each image so the correspondence is visible.
-4. Crop corresponding regions with `crop_multiple_bounding_boxes`.
-5. Directly inspect the annotated images and crop outputs.
-6. Use returned `resolvedPixelBox` metadata to quantify `width`, `height`, and `area` before making size claims.
-7. Describe both absolute differences and relative differences against nearby regions.
+```text
+gap = card2.left - card1.right = 412 - 330 = 82px
+```
 
-Use numeric differences to choose where to inspect; use image evidence to explain what is happening.
-
-## Aligning Images
-
-Alignment requires explicit coordinate evidence.
-
-Use shared frames of reference:
-
-- image dimensions;
-- viewport or canvas size;
-- matching labels;
-- corresponding boxes;
-- center points;
-- distances to nearby anchors;
-- pixel coordinates and normalized thousandths.
-
-When alignment matters, record both pixel coordinates and normalized `0-999` coordinates. Pixel coordinates preserve implementation precision. Normalized coordinates make cross-size comparison easier.
-
-## Second-Order Quantities Must Be Computed
-
-Distance, gap, size difference, alignment offset, and ratio are second-order quantities: they are derived from multiple coordinates, not read directly.
-
-Procedure for any second-order quantity:
-
-1. Estimate each endpoint or edge coordinate separately using direct perception.
-2. Write the arithmetic explicitly, for example: `gap = card2.left - card1.right = 412 - 330 = 82px`.
-3. Report the computed result, not the visual impression.
-
-Alignment checks follow the same rule: record both edge coordinates, subtract to get the offset, and compare the computed offset against the task tolerance.
-
-## Analyzing Images
-
-Use the smallest useful region, then iterate.
-
-1. Start from the visible appearance.
-2. Write coordinates for the local geometry.
-3. Generate an annotation or crop.
-4. Inspect the artifact directly.
-5. Refine the coordinates, labels, or interpretation.
-6. Repeat until the evidence is specific enough to support the conclusion.
-
-For point-centered defects such as overlaps, cursor targets, label anchors, tiny artifacts, or alignment points, use `crop_around_point` only with an explicit `radius` or `size` chosen for the inspection.
-
-For color-sensitive questions, use `sample_colors` at explicit points or small local patches when CSS-level color precision matters. Avoid broad color names when a visual claim depends on hue, brightness, contrast, or gradient behavior.
-
-## Evidence Notes
-
-When writing conclusions, include:
-
-- source image path;
-- artifact paths for annotations and crops;
-- labels and coordinates;
-- coordinate space and origin;
-- `resolvedPixelBox` width, height, and area when comparing sizes;
-- `sample_colors` points and hex/RGB/OKLab results when color precision matters;
-- direct visual observations from the artifacts;
-- uncertainties or regions that need another crop.
+Use returned `resolvedPixelBox` values to calculate width, height, area, and offsets before reporting them.
 
 ## Common Mistakes
 
-- Treating tool output metadata as more authoritative than direct viewing.
-- Skipping annotation before relying on estimated boxes.
-- Forgetting to crop after annotation when precision matters.
-- Comparing images with mismatched labels or coordinate frames.
-- Using `normalized-999` for screenshots when pixel coordinates are the natural frame.
-- Reporting detailed visual claims before directly inspecting generated artifacts.
-- Treating a broad box as precise because it contains the target.
-- Claiming the tools automatically detect or identify image content.
+- Treating result metadata as a substitute for viewing the generated image.
+- Reporting a visual claim before inspecting the annotation or crop.
+- Using mismatched labels, image dimensions, or coordinate frames across images.
+- Omitting an explicit `--radius` or `--size` for `vp point`.
+- Using broad color names when `vp colors` can provide exact local evidence.
+- Claiming the commands automatically locate or identify image content.

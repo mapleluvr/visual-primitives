@@ -4,8 +4,10 @@ Use `masked-oracle-diff` during Verify after a rendered screenshot exists at the
 
 ## Command
 
+Resolve the runner relative to the loaded `frontend-replication` Skill directory. It is package-local and works from the consumer project's working directory without a host-project npm script:
+
 ```bash
-npm run oracle:diff -- --manifest docs/visual-primitives/runs/<run-id>/scripts/diff-manifest.json
+node <frontend-replication-skill-dir>/scripts/run-masked-oracle-diff.mjs --manifest docs/visual-primitives/runs/<run-id>/scripts/diff-manifest.json
 ```
 
 ## Manifest Path

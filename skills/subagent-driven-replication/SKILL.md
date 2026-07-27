@@ -49,9 +49,9 @@ Initial Draft may use a read-write subagent. This worker is closer to a visual a
 Give the visual annotation worker permission to use:
 
 ```text
-annotate_bounding_boxes
-crop_bounding_box
-crop_multiple_bounding_boxes
+vp annotate
+vp crop
+vp crop-multi
 write/edit draft markdown
 ```
 
@@ -95,15 +95,15 @@ Reviewer tasks should inspect the actual artifacts:
 - masked diff outputs;
 - code diff or implementation files when relevant.
 
-The Orchestrator prepares or approves `scripts/diff-manifest.json`, then runs or assigns exactly one worker/reviewer step to run:
+The Orchestrator prepares or approves `scripts/diff-manifest.json`, resolves `scripts/run-masked-oracle-diff.mjs` relative to the loaded `frontend-replication` Skill directory, then runs or assigns exactly one worker/reviewer step to run:
 
 ```bash
-npm run oracle:diff -- --manifest docs/visual-primitives/runs/<run-id>/scripts/diff-manifest.json
+node <frontend-replication-skill-dir>/scripts/run-masked-oracle-diff.mjs --manifest docs/visual-primitives/runs/<run-id>/scripts/diff-manifest.json
 ```
 
 Diff evidence should include `VERDICT.md`, `summary.json`, `matrix.json`, `components.json`, and `stripes.json` from `diffs/`.
 
-When `components.json` reports local highlights, assign exactly one current worker or reviewer step to inspect important component centers with `crop_around_point`. Ask for second-order coordinate calculations for offsets, gaps, sizes, and alignment, and use `sample_colors` when the component suggests a color, contrast, gradient, or shadow mismatch.
+When `components.json` reports local highlights, assign exactly one current worker or reviewer step to inspect important component centers with `vp point`. Ask for second-order coordinate calculations for offsets, gaps, sizes, and alignment, and use `vp colors` when the component suggests a color, contrast, gradient, or shadow mismatch.
 
 Ask reviewers for approval findings scoped to draft reasonableness, completion, and evidence quality. Useful angles include:
 
