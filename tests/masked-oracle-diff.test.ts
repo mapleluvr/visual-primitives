@@ -1,9 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { access, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { promisify } from "node:util";
 import sharp from "sharp";
+
+const execFileAsync = promisify(execFile);
+const packageRoot = new URL("..", import.meta.url);
+const packageRootPath = decodeURIComponent(packageRoot.pathname).replace(/^\/(?:([A-Za-z]:))/, "$1");
+const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+
+async function runNpm(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  if (process.platform === "win32") {
+    return execFileAsync(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", npmCommand, ...args], { cwd: packageRootPath });
+  }
+  return execFileAsync(npmCommand, args, { cwd: packageRootPath });
+}
 
 async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), "masked-oracle-diff-test-"));
@@ -102,7 +116,7 @@ test("masked-oracle-diff writes artifacts and excludes masked pixels from scorin
       },
     }, null, 2));
 
-    const { runMaskedOracleDiff } = await import("../scripts/masked-oracle-diff.ts");
+    const { runMaskedOracleDiff } = await import("../skills/frontend-replication/scripts/masked-oracle-diff.ts");
     const result = await runMaskedOracleDiff({ manifestPath: manifest });
 
     assert.equal(result.summaryPath, join(outputDir, "summary.json"));
@@ -179,7 +193,7 @@ test("masked-oracle-diff handles large same-size images without spread overflow"
       },
     }, null, 2));
 
-    const { runMaskedOracleDiff } = await import("../scripts/masked-oracle-diff.ts");
+    const { runMaskedOracleDiff } = await import("../skills/frontend-replication/scripts/masked-oracle-diff.ts");
     await runMaskedOracleDiff({ manifestPath: manifest });
 
     const summary = await readJson(join(outputDir, "summary.json"));
@@ -216,7 +230,7 @@ test("masked-oracle-diff filters tiny noise components while preserving larger l
       },
     }, null, 2));
 
-    const { runMaskedOracleDiff } = await import("../scripts/masked-oracle-diff.ts");
+    const { runMaskedOracleDiff } = await import("../skills/frontend-replication/scripts/masked-oracle-diff.ts");
     await runMaskedOracleDiff({ manifestPath: manifest });
 
     const components = await readJson(join(outputDir, "components.json"));
@@ -231,6 +245,33 @@ test("masked-oracle-diff filters tiny noise components while preserving larger l
     const verdict = await readFile(join(outputDir, "VERDICT.md"), "utf8");
     assert.match(verdict, /bbox 10,10,13,13/);
     assert.doesNotMatch(verdict, /bbox 2,2,3,3/);
+  });
+});
+
+test("npm oracle:diff script resolves the relocated helper", async () => {
+  await withTempDir(async (dir) => {
+    const oracle = join(dir, "oracle.png");
+    const rendered = join(dir, "rendered.png");
+    const manifest = join(dir, "manifest.json");
+    const outputDir = join(dir, "diff-output");
+
+    await writeFixturePng(oracle, 12, 12);
+    await writeFixturePng(rendered, 12, 12, (buffer) => {
+      fillRect(buffer, 12, 3, 3, 7, 7, [0, 0, 0, 255]);
+    });
+    await writeFile(manifest, JSON.stringify({
+      oracleImage: oracle,
+      renderedImage: rendered,
+      outputDir,
+      coordinateSpace: "pixel",
+      exclusionBoxes: [],
+    }, null, 2));
+
+    const { stdout, stderr } = await runNpm(["run", "oracle:diff", "--", "--manifest", manifest]);
+    assert.equal(stderr, "");
+    assert.match(stdout, /summary\.json/);
+    assert.equal(await fileExists(join(outputDir, "summary.json")), true);
+    assert.equal(await fileExists(join(outputDir, "VERDICT.md")), true);
   });
 });
 
@@ -251,7 +292,7 @@ test("masked-oracle-diff writes blocked summary and verdict for dimension mismat
       exclusionBoxes: [],
     }, null, 2));
 
-    const { runMaskedOracleDiff } = await import("../scripts/masked-oracle-diff.ts");
+    const { runMaskedOracleDiff } = await import("../skills/frontend-replication/scripts/masked-oracle-diff.ts");
     await assert.rejects(
       () => runMaskedOracleDiff({ manifestPath: manifest }),
       /identical dimensions/,

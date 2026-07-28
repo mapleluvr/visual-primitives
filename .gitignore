@@ -1,5 +1,10 @@
 node_modules/
+dist/
+skills/frontend-replication/scripts/masked-oracle-diff.js
 npm-debug.log*
 .DS_Store
 *.crop-*.png
 tmp/
+.worktrees/
+.superpowers/
+.pi-subagents/

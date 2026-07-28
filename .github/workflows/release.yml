@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish npm package and GitHub Release
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify first-publication bootstrap
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BOOTSTRAPPED: ${{ vars.RELEASE_BOOTSTRAPPED }}
+          TARGET_REPOSITORY: mapleluvr/visual-primitives
+        run: |
+          test "${RELEASE_BOOTSTRAPPED}" = "true"
+          test "${GITHUB_REPOSITORY}" = "${TARGET_REPOSITORY}"
+          gh api "repos/${TARGET_REPOSITORY}" >/dev/null
+          npm run release:verify-bootstrap
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm install --global npm@11.6.2
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm test
+      - run: npm run package:smoke
+      - run: npm audit --audit-level=high
+      - run: npm run release:verify-tag -- "${GITHUB_REF_NAME}"
+      - name: Build release artifacts
+        run: |
+          mkdir release
+          npm pack --json --ignore-scripts --pack-destination release > release/pack.json
+          sha256sum release/*.tgz > release/SHA256SUMS
+          npm sbom --sbom-format spdx > release/sbom.spdx.json
+      - name: Resolve npm publication state
+        id: npm-state
+        run: node scripts/resolve-release-state.mjs release/pack.json
+      - name: Publish npm package
+        if: steps.npm-state.outputs.publish == 'true'
+        run: npm publish release/*.tgz --provenance --access public
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
+            gh release create "${GITHUB_REF_NAME}" --verify-tag --generate-notes
+          gh release upload "${GITHUB_REF_NAME}" \
+            release/*.tgz release/SHA256SUMS release/sbom.spdx.json --clobber

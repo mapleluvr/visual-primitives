@@ -71,13 +71,13 @@ docs/visual-primitives/runs/<run-id>/
 Directory behavior:
 
 - `oracles/`: oracle pictures, source reference images, user descriptions, derived descriptions, and `oracle-manifest.json`.
-- `annots/`: outputs from `annotate_bounding_boxes`.
-- `cropped/`: outputs from `crop_bounding_box` and `crop_multiple_bounding_boxes`.
+- `annots/`: outputs from `vp annotate`.
+- `cropped/`: outputs from `vp crop` and `vp crop-multi`.
 - `rendered/`: rendered webpage screenshots.
 - `diffs/`: masked diff artifacts and summaries.
 - `drafts/`: initial and feedback drafts. Drafts accumulate as new files.
 - `verdict/`: process verdicts from inline or subagent verification. A verdict is feedback evidence and may become stale.
-- `scripts/`: run-local manifests, screenshot commands, and one-off task scripts. Shared implementation scripts belong in the package `scripts/` or `src/` directories.
+- `scripts/`: run-local manifests, screenshot commands, and one-off task scripts. The packaged `masked-oracle-diff` implementation remains under this Skill's `scripts/` resources.
 - `final/`: final direct-inspection notes and user-facing delivery review artifacts.
 
 ## Oracle Intake
@@ -87,14 +87,14 @@ If the user provides screenshots or reference images without sufficient text, de
 Use `using-visual-primitives` to:
 
 1. register oracle images under `oracles/`;
-2. annotate major regions with `annotate_bounding_boxes`;
+2. annotate major regions with `vp annotate`;
 3. directly inspect annotated outputs;
 4. crop important regions with the same coordinates;
 5. directly inspect crop outputs;
 6. write an evidence-backed oracle description;
 7. write or update `oracles/oracle-manifest.json` using `references/oracle-manifest.md`.
 
-The derived oracle description should record layout, visual hierarchy, region labels, important coordinates, relative positions, colors or `sample_colors` evidence, code-drawable areas, exclusion candidates, and evidence artifact paths. Use `references/draft-contract.md` for draft shape and `references/screenshot-capture.md` before Verify needs rendered images.
+The derived oracle description should record layout, visual hierarchy, region labels, important coordinates, relative positions, colors or `vp colors` evidence, code-drawable areas, exclusion candidates, and evidence artifact paths. Use `references/draft-contract.md` for draft shape and `references/screenshot-capture.md` before Verify needs rendered images.
 
 If the user already provided a description, keep it as authoritative intent. The derived description supplements it with visual evidence; it does not replace user intent.
 

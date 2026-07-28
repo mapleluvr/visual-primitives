@@ -1,327 +1,143 @@
-# Pi Visual Primitives
+# Visual Primitives
 
 [English](README.md)
 
-Pi Visual Primitives 是一个 Pi 扩展包，为 Agent 提供视觉证据工作流辅助工具。适用场景包括图片、截图、渲染 UI、参考设计、视觉效果、前端视觉复现、视觉对比和视觉 QA，只要任务需要从视觉外观中得出结论，就可以使用它。
+`@mapleluvr/visual-primitives` 用一个统一版本的 package 提供：
 
-视觉证据需求会触发这个包。坐标可以由用户提供，也可以由 Agent 在证据工作流中选择或估计；随后这些坐标会被转换成本地裁剪图、标注图、点裁剪图和颜色采样结果，供 Agent 直接查看、复用和推理。
+- 与工作流无关的 `vp` CLI，将明确给定的框和点转换为可检查的图像证据；
+- 六个 Agent Skills，分别覆盖通用视觉证据和前端复现工作流。
 
-这个设计受到 “Thinking with Visual Primitives” 思路启发：点和 bounding box 可以作为视觉推理中的具体空间参照。检测、OCR、分割、自动生成 box、自动推断 UI 元素等能力留在工具契约之外；本包负责把用户提供或 Agent 估计的区域转换成可检查的本地证据产物。
+需要 Node.js 22.18 或更高版本。这个 package 不负责目标检测、OCR、图像分割、自动生成框或自动推断 UI 元素。坐标由用户或 agent 提供，生成的图像仍需直接视觉检查后才能解释。
 
-## 功能
+## 安装 CLI
 
-- 为截图分析、前端视觉复现、视觉对比和视觉 QA 创建视觉证据产物。
-- 标注或裁剪 header、card、sidebar、form、button、chart、footer 等 UI 区域。
-- 从本地图片裁剪一个 bounding box。
-- 从同一张图片批量裁剪多个 box，并生成确定性的输出文件名。
-- 创建和原图同尺寸的标注预览图，带 box 边框和可选 label。
-- 围绕明确的点进行裁剪，必须提供 radius 或 width/height。
-- 使用 `sample_colors` 在指定点采样精确颜色，支持 CSS 级颜色精度。
-- 支持论文风格的 `0-999` 归一化坐标。
-- 支持直接像素坐标。
-- 支持 top-left 和 bottom-left 坐标原点。
-- 支持 `[left, top, right, bottom]` 和 `[left, bottom, right, top]` 两种 box 顺序。
-- 支持可选 padding。
-- 支持可选边界 clamp。
-- 返回包含 source dimensions 和 resolved pixel box 的结构化 metadata。
-
-## 安装
-
-从仓库 checkout 安装依赖：
+从 npm 全局安装两个等价的命令别名：
 
 ```bash
-cd pi-visual-primitives
-npm install
+npm install -g @mapleluvr/visual-primitives
+vp --help
+visual-primitives --version
 ```
 
-在 Pi 中临时使用：
+公开命令面严格包含五个子命令：
+
+| 命令 | 用途 |
+| --- | --- |
+| `vp crop` | 裁剪一个矩形区域。 |
+| `vp crop-multi` | 从同一张图裁剪多个区域。 |
+| `vp annotate` | 在同尺寸预览图上绘制带标签的框。 |
+| `vp point` | 按明确的点和半径或尺寸裁剪。 |
+| `vp colors` | 在明确的点采样精确颜色。 |
+
+运行 `vp <command> --help` 查看完整 flags 和 JSON 输入文档。
+
+## CLI 示例
+
+Flag 模式默认使用像素坐标：
 
 ```bash
-pi -e ./pi-visual-primitives
+vp annotate screenshot.png --box "header:40,30,240,180" --out annotated.png
+vp crop screenshot.png --box "40,30,240,180" --out header.png
+vp crop-multi screenshot.png \
+  --box "header:40,30,240,180" \
+  --box "button:280,220,420,280" \
+  --out-dir crops
+vp point screenshot.png --point "80,50" --radius 30 --out detail.png
+vp colors screenshot.png --point "header-bg:80,50" --patch 3
 ```
 
-作为 Pi package 安装，让 Pi 同时加载扩展工具和 Skill：
+归一化千分位坐标使用 `--space normalized-999`；y 轴向上时使用 `--origin bottom-left`；左下原点的框顺序使用 `--box-order left-bottom-right-top`。
+
+成功命令会向 stdout 写出一个 JSON 值。摘要和 warning 写到 stderr，可用 `--quiet` 抑制。用法错误退出码为 `2`；图像或文件系统运行时错误退出码为 `1`。
+
+### JSON 兼容模式
+
+`--json <file|->` 接受原先五个 Pi tool 的 payload 形状。JSON 模式保留 `normalized-999` 默认值，并拒绝未知字段、错误类型、非有限数值、非法枚举、互斥字段和不适用于命令的字段。
 
 ```bash
-pi install ./pi-visual-primitives
+vp crop --json crop.json
 ```
 
-然后在 Pi 中运行 `/reload`。
-
-## 技能集
-
-本包在 `skills/` 下提供一组 Pi Skill：
-
-- `skills/using-visual-primitives/SKILL.md`：通用视觉证据工作，包括标记、裁剪、对比、对齐和分析图像。
-- `skills/frontend-replication/SKILL.md`：基于 oracle 图片的前端复现入口 skill。
-- `skills/inline-replication/SKILL.md`：由父 Agent 自行执行的复现循环。
-- `skills/subagent-driven-replication/SKILL.md`：由 Orchestrator 编排 subagent 的复现循环。该路线可使用 `pi-subagents`、`subagent-driven-development` 和 superpowers workflow；如果环境不可用，则使用 `inline-replication`。
-- `skills/refining-with-feedback/SKILL.md`：把过程性 verdict 转换为下一轮 feedback draft。
-- `skills/finalizing-replication/SKILL.md`：最终直接检查和交付审查。
-
-独立视觉证据任务使用 `using-visual-primitives`；截图 oracle 驱动的网页复现使用 `frontend-replication`。
-
-## 视觉证据工作流示例
-
-对于 `Recreate this dashboard screenshot and match the spacing` 这样的任务，Agent 应该先识别截图，判断哪些视觉结论需要证据，标注 `sidebar`、`header`、`primary-card`、`button` 等主要区域，裁剪关键区域进行聚焦检查，实现 UI，然后在渲染后对比 reference/current 的对应区域。
-
-对于截图和渲染 UI，优先使用 `coordinateSpace: "pixel"`。只有当来源明确使用论文/模型风格的 visual primitive 坐标时，才使用默认的 `normalized-999`。
-
-## 完整示例
-
-前端是用来看的。两组 render 都是一个中档前端模型（GPT 5.5）在 `frontend-replication` -> `inline-replication` 驱动下完成的一次性输出。
-
-这些结果依赖工作流被真正执行。经过A/B实验可以发现工作流对于复现以下结果来说，是非常必要的。使用的Prompt示例：
-
-```text
-Replicate the frontend screenshot at <path> (viewport <W>x<H>). Follow the
-frontend-replication workflow strictly.
-
-- Match the oracle's exact pixel dimensions in the rendered screenshot.
-- Render every code-drawable region in code (CSS/SVG): text, song/artist names,
-  table columns, icons, badges, status pills, progress bars, and brand colors.
-- Approved exclusions may be represented by placeholders or delegated image assets: avatars, album / cover art, organic illustrations, and dense logo marks.
-- Keep code-drawable content inside the scoring domain; use exclusions only for
-  tightly bounded regions that cannot be described as boxes and paths.
+```json
+{
+  "imagePath": "screenshot.png",
+  "box": [40, 30, 240, 180],
+  "coordinateSpace": "pixel",
+  "outputPath": "header.png"
+}
 ```
 
-排除边界由“文本模型用代码渲染什么”决定。用代码渲染所有可代码绘制区域，让可代码绘制的区域被用于工作流内自评估完成度。批准的排除区域可以用占位图或委托图像资产表示。
+## 在 Pi 中安装 Skill Set
 
-### 简单任务：快速且准确
-
-Oracle 是一个分析仪表盘 mockup：sidebar、KPI 行、两个 chart card 和 transaction table 组成的规则布局。
-
-![仪表盘 mockup 与单次 render 对照](docs/visual-primitives/examples/pulse-side-by-side.png)
-
-*左：oracle mockup。右：单次 render。*
-
-在这种干净、规则的布局上，工作流甚至不需要进入 feedback loop。第一次 render 已经接近 oracle：sidebar、stat cards、revenue area chart、traffic donut、transaction table 以及彩色 status pill 都落在正确位置；绿色上升、红色下降、琥珀色 pending 等语义色也被复现。简单目标通常能在一轮中快速得到准确结果。
-
-### 复杂任务：密集真实截图
-
-Oracle 是一张网易云音乐桌面端截图（`1448x940`），难度更高：三大区域、几十个可代码绘制 icon、`超清母带` / `VIP` badge、品牌红、多字号中文排版、右对齐表格列和浮动进度条。
-
-![网易云音乐截图与单次 render 对照](docs/visual-primitives/examples/netease-side-by-side.png)
-
-*左：作为 oracle 的真实截图。右：单次 render。完整分辨率示例都在 [`docs/visual-primitives/examples/`](docs/visual-primitives/examples/) 下。*
-
-这次 run 中有六个区域被委托出 code-replication scope 作为 exclusions：歌单封面、两个头像、两个曲目缩略图和旋转黑胶。工作流把有机的、想象驱动的图像交给图像资产或占位图，同时让结构化 UI 内容留在代码评分域。
-
-即使在这种密度下，单次 render 仍然保持了整体结构：布局骨架、表格对齐、badge 系统、品牌红和 icon glyph 都足够接近，剩余差异需要聚焦检查才能发现。近看可见的是小面积细节，而不是布局失败：
-
-- **网易云 logo mark** 只是近似绘制，render 在红色圆形内画了一个粗略 glyph，而不是精确的耳机/音符标志，尺寸和字重也略有偏差。
-- **进度条旋钮** 比红/灰分界线高了几个像素，没有完全居中。
-- 少数 icon 的 font-weight 差一个档位。
-
-网易云 logo mark 在这次 run 中保留在 code-replication scope 内，所以粗略 SVG 近似是一个可见 limitation。更严格的生产 run 可以把密集品牌标志声明为窄 exclusion candidate，和头像、封面图一起处理。评分域应保留给文本模型能够描述并准确渲染的结构化 UI 细节。
-
-## Masked Oracle Diff CLI
-
-`masked-oracle-diff` 会比较 oracle image 和 rendered image，同时排除经过窄边界论证的非代码可精确绘制区域。exclusion box 之外的所有像素都会进入评分域。
-
-运行方式：
+安装固定 npm 版本：
 
 ```bash
-npm run oracle:diff -- --manifest docs/visual-primitives/runs/<run-id>/scripts/diff-manifest.json
+pi install npm:@mapleluvr/visual-primitives@0.2.0
 ```
 
-CLI 会把 `diff.gray.png`、mask、preview、`25 x 25` matrix、components、stripes、`summary.json` 和 `VERDICT.md` 写入 manifest 的 `outputDir`。
+或者安装固定 Git tag：
 
-## 工具：`crop_bounding_box`
-
-从源图片裁剪一个已提供的 bounding box。
-
-| 参数 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `imagePath` | `string` | required | 源图片路径。相对路径按 Pi 当前工作目录解析。前导 `@` 会被忽略。 |
-| `box` | `[number, number, number, number]` | required | Bounding box 坐标。 |
-| `coordinateSpace` | `"normalized-999" \| "pixel"` | `"normalized-999"` | 按论文风格归一化坐标或直接像素坐标解释。 |
-| `origin` | `"top-left" \| "bottom-left"` | `"top-left"` | 坐标原点。Bottom-left 表示 y 轴向上增长。 |
-| `boxOrder` | `"left-top-right-bottom" \| "left-bottom-right-top"` | `"left-top-right-bottom"` | 输入 box 的坐标顺序。 |
-| `outputPath` | `string` | generated | 输出 PNG 路径。相对路径按 Pi 当前工作目录解析。 |
-| `padding` | `number` | `0` | 在 resolved box 周围增加的像素 padding。 |
-| `clamp` | `boolean` | `true` | 把越界 box 裁到图片边界内。设为 false 时，越界 box 会失败。 |
-
-## 工具：`crop_multiple_bounding_boxes`
-
-从同一张源图片裁剪多个 box。它复用 `crop_bounding_box` 的坐标选项，并采用 fail-fast 行为。
-
-| 参数 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `imagePath` | `string` | required | 源图片路径。 |
-| `boxes` | `Array<{ box, label?, outputPath? }>` | required | 要裁剪的 box。每个条目可以包含 label 和单独的输出路径。 |
-| `outputDir` | `string` | generated beside source | 当 box 没有提供 `outputPath` 时，用于生成裁剪文件的目录。 |
-| `coordinateSpace` | `"normalized-999" \| "pixel"` | `"normalized-999"` | 所有 box 共享的坐标解释。 |
-| `origin` | `"top-left" \| "bottom-left"` | `"top-left"` | 所有 box 共享的坐标原点。 |
-| `boxOrder` | `"left-top-right-bottom" \| "left-bottom-right-top"` | `"left-top-right-bottom"` | 所有 box 共享的坐标顺序。 |
-| `padding` | `number` | `0` | 所有 box 共享的像素 padding。 |
-| `clamp` | `boolean` | `true` | 共享的边界 clamp 行为。 |
-
-示例：
-
-```json
-{
-  "imagePath": "scene.png",
-  "outputDir": "scene-crops",
-  "coordinateSpace": "pixel",
-  "boxes": [
-    { "label": "title", "box": [10, 20, 180, 80] },
-    { "label": "button", "box": [220, 300, 380, 360] }
-  ]
-}
+```bash
+pi install git:github.com/mapleluvr/visual-primitives@v0.2.0
 ```
 
-## 工具：`annotate_bounding_boxes`
+Pi package manifest 只加载 Skills，不注册 visual-primitives extension。
 
-创建一张带 box 标注的预览图。输出图片保持源图尺寸，并返回 resolved box metadata。
+Pi package 安装不保证 npm binary 会进入系统 `PATH`。因此 agent 指南通过 `skills/_shared/run-vp.mjs` 调用 package 内的 CLI；人类用户仍可使用全局安装的 `vp`。
 
-示例：
+## Skill Set
 
-```json
-{
-  "imagePath": "scene.png",
-  "outputPath": "scene-annotated.png",
-  "coordinateSpace": "pixel",
-  "boxes": [
-    { "label": "target", "box": [50, 40, 250, 180] }
-  ]
-}
+Package 包含六个可发现的 Skills：
+
+- `using-visual-primitives`：五个 `vp` 命令的选择和使用、坐标约定、直接检查与二阶测量。
+- `frontend-replication`：oracle 驱动前端复现的入口。
+- `inline-replication`：父 agent 执行的复现循环。
+- `subagent-driven-replication`：由父会话编排 worker 和 reviewer 的循环。
+- `refining-with-feedback`：整合 DraftHistory 与 verdict。
+- `finalizing-replication`：最终直接检查与交付路由。
+
+独立的图像和截图证据任务使用 `using-visual-primitives`。包含 oracle intake、实现轮次、masked scoring、verdict 或交付审查时使用 `frontend-replication`。专用 Skills 引用通用命令和坐标指南，不重复定义它们。
+
+## 前端工作流 Helper
+
+`masked-oracle-diff` 归 `frontend-replication` 工作流所有。它不是 `vp` 子命令，不是 npm binary，不是通用 core export，也不属于 `using-visual-primitives` 的职责。
+
+加载 replication Skill 后，相对于已加载的 `frontend-replication` Skill 目录解析 `scripts/run-masked-oracle-diff.mjs`，再从 consumer project 调用这个 package-local runner：
+
+```bash
+node <frontend-replication-skill-dir>/scripts/run-masked-oracle-diff.mjs --manifest docs/visual-primitives/runs/<run-id>/scripts/diff-manifest.json
 ```
 
-用它来验证 coordinate space、origin 或 box order 假设，再进行视觉判断。
+在本 package checkout 中工作的仓库维护者也可以使用 `npm run oracle:diff -- --manifest <path>`；consumer project 不需要这个 npm script。Runner、源码和构建后的 runtime 都位于 `skills/frontend-replication/scripts/`。Helper 会写出 mask、preview、diff 图、matrix、components、stripes、`summary.json` 和 `VERDICT.md`。干净的 diff 只会打开最终直接检查，不能自行宣布交付成功。
 
-## 工具：`sample_colors`
+## 版本策略
 
-在源图片的指定点采样精确像素色或 patch 平均色。适合需要 CSS 级颜色精度的场景。
+CLI 与 Skill Set 使用一个 package 版本和一个 Git tag。Package `X.Y.Z` 对应 tag `vX.Y.Z`。命令名、JSON 输入语义、退出码、已文档化的 Skill 资源和 helper 归属都属于受保护兼容契约。
 
-示例：
+## 从 `pi-visual-primitives` 迁移
 
-```json
-{
-  "imagePath": "scene.png",
-  "coordinateSpace": "pixel",
-  "patchSize": 3,
-  "points": [
-    { "label": "header-bg", "point": [130, 40] },
-    { "label": "cta-button", "point": [620, 340] }
-  ]
-}
-```
+旧 package 通过 Pi extension 注册 `crop_bounding_box`、`sample_colors` 等 TypeScript tools。`0.2.0` 用独立的五命令 CLI 和只包含 Skills 的 Pi package 取代该运行面。
 
-工具返回 resolved pixel points、RGB、hex、OKLab、patch size、sampled pixel count 和 patch mean hex。调色板和主色发现留在 point-sampling contract 之外。
-
-## 工具：`crop_around_point`
-
-围绕一个指定点裁剪区域。调用必须通过 `radius` 或 `size` 提供明确裁剪尺寸。
-
-Radius 示例：
-
-```json
-{
-  "imagePath": "scene.png",
-  "point": [500, 500],
-  "radius": 80,
-  "outputPath": "scene-point.png"
-}
-```
-
-明确 size 示例：
-
-```json
-{
-  "imagePath": "scene.png",
-  "point": [120, 90],
-  "size": { "width": 60, "height": 40 },
-  "coordinateSpace": "pixel"
-}
-```
-
-坐标选项与 `crop_bounding_box` 一致。
-
-### 归一化 visual-primitive box
-
-```json
-{
-  "imagePath": "scene.png",
-  "box": [120, 80, 420, 360]
-}
-```
-
-这会使用默认的 `coordinateSpace: "normalized-999"`，匹配 visual-primitives 论文约定。
-
-### 像素 box
-
-```json
-{
-  "imagePath": "scene.png",
-  "box": [50, 40, 250, 180],
-  "coordinateSpace": "pixel",
-  "outputPath": "scene-object.png"
-}
-```
-
-### Bottom-left 坐标系
-
-```json
-{
-  "imagePath": "plot.png",
-  "box": [10, 20, 60, 80],
-  "coordinateSpace": "pixel",
-  "origin": "bottom-left",
-  "boxOrder": "left-bottom-right-top"
-}
-```
-
-工具会把它转换成图像处理库需要的 top-left 像素矩形。
-
-### 严格边界检查
-
-```json
-{
-  "imagePath": "scene.png",
-  "box": [-10, 0, 100, 100],
-  "coordinateSpace": "pixel",
-  "clamp": false
-}
-```
-
-这个调用会失败，因为 box 超出了图片边界。
-
-## 返回 Metadata
-
-工具返回文本中包含输出路径和 resolved crop rectangle。结构化详情包括：
-
-- `imagePath`
-- `outputPath`
-- `source.width`
-- `source.height`
-- `source.format`
-- `input.box`
-- `input.coordinateSpace`
-- `input.origin`
-- `input.boxOrder`
-- `input.padding`
-- `input.clamp`
-- `resolvedPixelBox`
-- `unclampedPixelBox`
-- `clamped`
+1. 从 Pi settings 移除旧 package，或使用之前安装时的 source identity 卸载。
+2. 安装上面的 `npm:@mapleluvr/visual-primitives@0.2.0` 或固定 Git tag。
+3. 将旧 extension tool 调用替换为 `vp crop`、`vp crop-multi`、`vp annotate`、`vp point` 和 `vp colors`。
+4. Agent 执行时使用 `using-visual-primitives` 说明的 package-local launcher，不假设 `vp` 在 `PATH` 中。
+5. 将 masked oracle diff 工作保留在 frontend replication Skill family 内。
 
 ## 开发
 
-运行测试：
-
 ```bash
-npm test
-```
-
-运行语法检查：
-
-```bash
+npm ci --ignore-scripts
 npm run check
+npm test
+npm run package:smoke
+npm audit --audit-level=high
 ```
 
-测试使用 `sharp.create()` 生成临时 PNG fixture，因此仓库不需要额外的二进制测试 fixture。
+`npm run package:smoke` 会创建并安装临时 tarball，在生成的 PNG 上运行两个 binary aliases 和五个命令，验证六个 Skills，在从 `PATH` 移除 package bins 后执行 package-local launcher，并检查 frontend helper 的归属。
+
+CI 在 Ubuntu、Windows 和 macOS 上测试 Node 22.18.0 与 Node 24.x。发布仅由 tag 触发，并使用 npm Trusted Publishing 和 provenance。首次发布先决条件、失败重跑行为和需要单独授权的 live steps 记录在 [RELEASE.md](RELEASE.md)。创建或推送 release tag 是需要单独授权的发布动作；普通 commit 不会发布 package。
 
 ## 许可证
 
-MIT
+[MIT](LICENSE)

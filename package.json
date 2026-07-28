@@ -1,24 +1,66 @@
 {
-  "name": "pi-visual-primitives",
-  "version": "0.1.0",
-  "description": "Pi extension package for cropping image regions from visual primitive bounding boxes.",
+  "name": "@mapleluvr/visual-primitives",
+  "version": "0.2.0",
+  "description": "CLI for visual evidence primitives: crop, batch-crop, annotate, point-crop, and color sampling on local images and screenshots.",
   "type": "module",
-  "keywords": ["pi-package", "pi-extension", "visual-primitives", "bounding-box", "image-crop"],
+  "bin": {
+    "visual-primitives": "./dist/cli.js",
+    "vp": "./dist/cli.js"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "README.md",
+    "README.zh-CN.md",
+    "CHANGELOG.md",
+    "RELEASE.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "pi-package",
+    "cli",
+    "visual-primitives",
+    "bounding-box",
+    "image-crop",
+    "screenshot",
+    "visual-evidence",
+    "color-sampling"
+  ],
   "author": "mapleluvr",
   "license": "MIT",
-  "scripts": {
-    "check": "node --experimental-strip-types --check index.ts && node --experimental-strip-types --check src/schema.ts && node --experimental-strip-types --check src/crop.ts && node --experimental-strip-types --check src/phase2.ts && node --experimental-strip-types --check src/extension.ts && node --experimental-strip-types --check scripts/masked-oracle-diff.ts",
-    "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "oracle:diff": "node --experimental-strip-types scripts/masked-oracle-diff.ts"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mapleluvr/visual-primitives.git"
   },
-  "dependencies": {
-    "sharp": "^0.34.0"
+  "bugs": {
+    "url": "https://github.com/mapleluvr/visual-primitives/issues"
   },
-  "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
+  "homepage": "https://github.com/mapleluvr/visual-primitives#readme",
+  "publishConfig": {
+    "access": "public"
   },
   "pi": {
-    "extensions": ["./index.ts"],
-    "skills": ["./skills"]
+    "skills": [
+      "./skills"
+    ]
+  },
+  "scripts": {
+    "build": "node scripts/build-cli.mjs",
+    "check": "npm run build && node --check dist/cli.js && node --check scripts/package-smoke.mjs && node --check scripts/release-state.mjs && node --check scripts/resolve-release-state.mjs && node --check scripts/verify-release-bootstrap.mjs && node --check scripts/verify-release-tag.mjs && node --check skills/_shared/run-vp.mjs && node --check skills/frontend-replication/scripts/run-masked-oracle-diff.mjs && node --check skills/frontend-replication/scripts/masked-oracle-diff.js && node --check src/schema.ts && node --check src/crop.ts && node --check src/phase2.ts && node --check src/cli.ts && node --check skills/frontend-replication/scripts/masked-oracle-diff.ts",
+    "oracle:diff": "node skills/frontend-replication/scripts/masked-oracle-diff.js",
+    "package:smoke": "node scripts/package-smoke.mjs",
+    "prepare": "npm run build",
+    "release:verify-bootstrap": "node scripts/verify-release-bootstrap.mjs",
+    "release:verify-tag": "node scripts/verify-release-tag.mjs",
+    "test": "node --test \"tests/*.test.ts\""
+  },
+  "dependencies": {
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
   }
 }

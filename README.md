@@ -1,329 +1,143 @@
-# Pi Visual Primitives
+# Visual Primitives
 
 [中文](README.zh-CN.md)
 
-Pi Visual Primitives is a Pi extension package that gives agents visual evidence workflow helper tools. Use it for tasks involving images, screenshots, rendered UI, reference designs, visual effects, frontend visual reproduction, visual comparison, or visual QA when the agent needs to draw conclusions from visual appearance.
+`@mapleluvr/visual-primitives` ships one versioned package containing:
 
-Visual evidence needs trigger the package. Coordinates are selected, estimated, or provided during the evidence workflow, then turned into local crop, annotation, point-crop, and color-sampling artifacts that agents can inspect or reuse while reasoning about visuals.
+- the workflow-agnostic `vp` CLI for turning explicit boxes and points into inspectable image evidence; and
+- six Agent Skills for generic visual evidence and frontend replication workflows.
 
-The design is inspired by the "Thinking with Visual Primitives" paper overview: points and bounding boxes can act as concrete spatial references during visual reasoning. Detection, OCR, segmentation, automatic box generation, and automatic UI inference stay outside the tool contract. The package turns user-provided or agent-estimated regions into local evidence artifacts.
+Node.js 22.18 or newer is required. The package does not perform object detection, OCR, segmentation, automatic box generation, or UI inference. Users or agents provide the coordinates, and direct visual inspection remains the interpreter of generated artifacts.
 
-## Features
+## Install The CLI
 
-- Create visual evidence artifacts for screenshot analysis, frontend visual reproduction, visual comparison, and visual QA.
-- Annotate or crop UI regions such as headers, cards, sidebars, forms, buttons, charts, and footers.
-- Crop one bounding box from a local image.
-- Batch-crop multiple boxes from the same image with deterministic output names.
-- Create same-size annotated preview images with box outlines and optional labels.
-- Crop around an explicit point using a required radius or width/height.
-- Sample exact colors at provided points with `sample_colors` for CSS-level color precision.
-- Supports paper-style normalized `0-999` coordinates.
-- Supports direct pixel coordinates.
-- Supports top-left and bottom-left coordinate origins.
-- Supports `[left, top, right, bottom]` and `[left, bottom, right, top]` box orders.
-- Optional pixel padding.
-- Optional bounds clamping.
-- Returns structured metadata including source dimensions and resolved pixel box.
-
-## Installation
-
-From this repository checkout, install dependencies:
+Install both binary aliases globally from npm:
 
 ```bash
-cd pi-visual-primitives
-npm install
+npm install -g @mapleluvr/visual-primitives
+vp --help
+visual-primitives --version
 ```
 
-Use temporarily in Pi:
+The two aliases are equivalent. The public command surface contains exactly five commands:
+
+| Command | Purpose |
+| --- | --- |
+| `vp crop` | Crop one rectangular region. |
+| `vp crop-multi` | Crop several regions from one source image. |
+| `vp annotate` | Draw labeled boxes on a same-size preview. |
+| `vp point` | Crop around an explicit point and radius or size. |
+| `vp colors` | Sample exact colors at explicit points. |
+
+Run `vp <command> --help` for complete flag and JSON input documentation.
+
+## CLI Examples
+
+Flag mode defaults to pixel coordinates:
 
 ```bash
-pi -e ./pi-visual-primitives
+vp annotate screenshot.png --box "header:40,30,240,180" --out annotated.png
+vp crop screenshot.png --box "40,30,240,180" --out header.png
+vp crop-multi screenshot.png \
+  --box "header:40,30,240,180" \
+  --box "button:280,220,420,280" \
+  --out-dir crops
+vp point screenshot.png --point "80,50" --radius 30 --out detail.png
+vp colors screenshot.png --point "header-bg:80,50" --patch 3
 ```
 
-Install as a Pi package so Pi loads both the extension tool and the Skill:
+Use `--space normalized-999` for normalized thousandths, `--origin bottom-left` when y grows upward, and `--box-order left-bottom-right-top` for bottom-left box tuples.
+
+Every successful command writes one JSON value to stdout. Summaries and warnings go to stderr and can be suppressed with `--quiet`. Usage failures exit `2`; image and filesystem failures exit `1`.
+
+### JSON Compatibility
+
+`--json <file|->` accepts the original five Pi tool payload shapes. JSON mode preserves their `normalized-999` default and rejects unknown properties, wrong types, non-finite values, invalid enums, mutually exclusive fields, and command-inapplicable fields.
 
 ```bash
-pi install ./pi-visual-primitives
+vp crop --json crop.json
 ```
 
-Then run `/reload` in Pi.
+```json
+{
+  "imagePath": "screenshot.png",
+  "box": [40, 30, 240, 180],
+  "coordinateSpace": "pixel",
+  "outputPath": "header.png"
+}
+```
+
+## Install The Skill Set In Pi
+
+Install a pinned npm version:
+
+```bash
+pi install npm:@mapleluvr/visual-primitives@0.2.0
+```
+
+Or install a pinned Git tag:
+
+```bash
+pi install git:github.com/mapleluvr/visual-primitives@v0.2.0
+```
+
+The Pi package manifest loads Skills only. It does not register a visual-primitives extension.
+
+Pi package installation does not guarantee that npm binaries are placed on the system `PATH`. Agent guidance therefore invokes the packaged CLI through `skills/_shared/run-vp.mjs`. Humans may still use a globally installed `vp` binary.
 
 ## Skill Set
 
-This package includes a Pi Skill Set under `skills/`:
+The package includes six discoverable Skills:
 
-- `skills/using-visual-primitives/SKILL.md` for general visual evidence work: marking, cropping, comparing, aligning, and analyzing images.
-- `skills/frontend-replication/SKILL.md` as the gateway for oracle-image-driven frontend replication.
-- `skills/inline-replication/SKILL.md` for parent-agent execution loops.
-- `skills/subagent-driven-replication/SKILL.md` for orchestrated subagent replication loops. This route uses optional environment support from `pi-subagents`, `subagent-driven-development`, and superpowers workflows; use `inline-replication` when those are unavailable.
-- `skills/refining-with-feedback/SKILL.md` for turning process verdicts into feedback drafts.
-- `skills/finalizing-replication/SKILL.md` for final direct inspection and delivery review.
+- `using-visual-primitives`: generic guidance for selecting and using the five `vp` commands, coordinate conventions, direct inspection, and second-order measurements.
+- `frontend-replication`: gateway for oracle-driven frontend reproduction.
+- `inline-replication`: parent-agent replication loop.
+- `subagent-driven-replication`: orchestrated worker and reviewer loop.
+- `refining-with-feedback`: draft-history and verdict synthesis.
+- `finalizing-replication`: final direct inspection and delivery routing.
 
-Use `using-visual-primitives` for standalone visual evidence tasks and `frontend-replication` for screenshot-oracle webpage reproduction.
+Use `using-visual-primitives` for standalone image and screenshot evidence. Use `frontend-replication` when the task includes oracle intake, implementation rounds, masked scoring, verdicts, or delivery review. Specialized Skills reference the generic command and coordinate guidance instead of duplicating it.
 
-## Visual Evidence Workflow Example
+## Frontend Workflow Helper
 
-For a prompt like `Recreate this dashboard screenshot and match the spacing`, an agent should identify the screenshot, decide which visual conclusions need evidence, annotate major regions such as `sidebar`, `header`, `primary-card`, and `button`, crop important areas for focused inspection, implement the UI, then compare equivalent reference/current regions after rendering.
+`masked-oracle-diff` remains owned by the frontend replication workflow. It is not a `vp` command, npm binary, generic core export, or responsibility of `using-visual-primitives`.
 
-For screenshots and rendered UI, prefer `coordinateSpace: "pixel"` unless the source clearly uses normalized visual-primitive coordinates. For paper-style visual primitive coordinates, use the default `normalized-999` behavior.
-
-## Worked Examples
-
-Frontend is meant to be looked at, so these examples are shown, not scored. Both renders are a single pass by a mid-tier frontend model driven through `frontend-replication` -> `inline-replication`.
-
-These results depend on the workflow actually being followed. The quality comes from running the replication loop, not from the model alone — skip the workflow and let the model free-run, and the output degrades noticeably. A short starting prompt that reliably drives the loop:
-
-```text
-Replicate the frontend screenshot at <path> (viewport <W>x<H>). Follow the
-frontend-replication workflow strictly.
-
-- Match the oracle's exact pixel dimensions in the rendered screenshot.
-- Render every code-drawable region in code (CSS/SVG): text, song/artist names,
-  table columns, icons, badges, status pills, progress bars, and brand colors.
-- Approved exclusions may be represented by placeholders or delegated image assets: avatars, album / cover art, organic illustrations, and dense logo marks.
-- Keep code-drawable content inside the scoring domain; use exclusions only for
-  tightly bounded regions that cannot be described as boxes and paths.
-```
-
-The exclusion boundary is drawn by *what a text model can render*, not by *what is an image*. The code-drawable list keeps structured UI work inside the scoring domain instead of quietly widening exclusions to make the task easier.
-
-### Simple task: fast and accurate
-
-The oracle is an analytics dashboard mockup — a regular layout of a sidebar, a KPI row, two chart cards, and a transactions table.
-
-![Dashboard mockup next to the single-pass render](docs/visual-primitives/examples/pulse-side-by-side.png)
-
-*Left: the oracle mockup. Right: the single-pass render.*
-
-On a clean, regular layout like this the workflow does not even need its feedback loop. The first render matches the oracle closely enough that the two are hard to tell apart at a glance — sidebar, stat cards, the revenue area chart, the traffic donut, and the transactions table with its colored status pills all land in place, with the semantic colors (green up-deltas, red down-deltas, amber pending) reproduced. Simple targets come out fast and accurate in one pass.
-
-### Complex task: a dense real-world screenshot
-
-The oracle is a real NetEase Cloud Music desktop screenshot (`1448x940`) — a much harder target: a three-region client with dozens of code-drawable icons, badge systems (`超清母带`, `VIP`), a brand-specific red, multi-size Chinese typography, right-aligned table columns, and a floating progress bar.
-
-![NetEase screenshot next to the single-pass render](docs/visual-primitives/examples/netease-side-by-side.png)
-
-*Left: the real screenshot used as the oracle. Right: the single-pass render. Full-resolution copies of every example are under [`docs/visual-primitives/examples/`](docs/visual-primitives/examples/).*
-
-Six regions were **delegated out of the code-replication scope** as exclusions rather than reproduced by the text model — the playlist cover art, two avatars, two track thumbnails, and the rotating vinyl. The workflow delegates organic, imagination-driven imagery to image assets or placeholders, while keeping structured UI content in the code-scored domain.
-
-Even at this density the single-pass render holds together — the layout skeleton, table alignment, badge system, brand red, and icon glyphs all reproduce closely enough that the remaining differences take focused inspection to find. What is visible on close viewing is small-area detail rather than layout failure:
-
-- The **NetEase logo mark** is only approximated — the render draws a rough glyph inside the red circle instead of the precise headphone/note mark, and its size and weight are slightly off.
-- The **progress-bar knob** sits a few pixels high of the red/gray boundary instead of centered on it.
-- A handful of icons differ by a font-weight step.
-
-The NetEase logo mark was left in the code-replication scope for this run, so its rough SVG approximation remains a visible limitation. In stricter production runs, dense brand marks can be declared as narrow exclusion candidates alongside avatars and cover art. The scoring domain is reserved for structured UI details a text model can describe and render accurately.
-
-## Masked Oracle Diff CLI
-
-`masked-oracle-diff` compares an oracle image and rendered image while excluding narrowly justified non-code-drawable regions. Everything outside the exclusion boxes is scored.
-
-Run it with:
+When a replication Skill is loaded, resolve `scripts/run-masked-oracle-diff.mjs` relative to the loaded `frontend-replication` Skill directory and invoke that package-local runner from the consumer project:
 
 ```bash
-npm run oracle:diff -- --manifest docs/visual-primitives/runs/<run-id>/scripts/diff-manifest.json
+node <frontend-replication-skill-dir>/scripts/run-masked-oracle-diff.mjs --manifest docs/visual-primitives/runs/<run-id>/scripts/diff-manifest.json
 ```
 
-The CLI writes `diff.gray.png`, masks, previews, a `25 x 25` matrix, components, stripes, `summary.json`, and `VERDICT.md` into the manifest `outputDir`.
+A repository maintainer working in this package checkout may instead use `npm run oracle:diff -- --manifest <path>`. Consumer projects do not need that npm script. The runner, source, and built runtime live under `skills/frontend-replication/scripts/`. The helper writes masks, previews, diff images, matrix data, components, stripes, `summary.json`, and `VERDICT.md`. A clean diff opens final direct inspection; it does not declare delivery success by itself.
 
-## Tool: `crop_bounding_box`
+## Versioning
 
-Crops one provided bounding box from a source image.
+The CLI and Skill Set use one package version and one Git tag. Package version `X.Y.Z` corresponds to tag `vX.Y.Z`. Command names, JSON input semantics, exit codes, documented Skill resources, and helper ownership are protected compatibility contracts.
 
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| `imagePath` | `string` | required | Source image path. Relative paths resolve against Pi's current working directory. A leading `@` is ignored. |
-| `box` | `[number, number, number, number]` | required | Bounding box coordinates. |
-| `coordinateSpace` | `"normalized-999" \| "pixel"` | `"normalized-999"` | Interpret coordinates as paper-style normalized values or direct pixels. |
-| `origin` | `"top-left" \| "bottom-left"` | `"top-left"` | Coordinate origin. Bottom-left means y grows upward. |
-| `boxOrder` | `"left-top-right-bottom" \| "left-bottom-right-top"` | `"left-top-right-bottom"` | Coordinate order of the input box. |
-| `outputPath` | `string` | generated | Output PNG path. Relative paths resolve against Pi's current working directory. |
-| `padding` | `number` | `0` | Pixel padding added around the resolved box. |
-| `clamp` | `boolean` | `true` | Clip out-of-bounds boxes to image bounds. If false, out-of-bounds boxes fail. |
+## Migration from `pi-visual-primitives`
 
-## Tool: `crop_multiple_bounding_boxes`
+The legacy package registered TypeScript Pi extension tools such as `crop_bounding_box` and `sample_colors`. Version `0.2.0` replaces that runtime surface with the standalone five-command CLI and a skills-only Pi package.
 
-Crops several boxes from the same source image in one fail-fast call. It reuses the same coordinate options as `crop_bounding_box`.
-
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| `imagePath` | `string` | required | Source image path. |
-| `boxes` | `Array<{ box, label?, outputPath? }>` | required | Boxes to crop. Each item may include a label and per-box output path. |
-| `outputDir` | `string` | generated beside source | Directory for generated crop files when a box does not provide `outputPath`. |
-| `coordinateSpace` | `"normalized-999" \| "pixel"` | `"normalized-999"` | Coordinate interpretation shared by all boxes. |
-| `origin` | `"top-left" \| "bottom-left"` | `"top-left"` | Coordinate origin shared by all boxes. |
-| `boxOrder` | `"left-top-right-bottom" \| "left-bottom-right-top"` | `"left-top-right-bottom"` | Coordinate order shared by all boxes. |
-| `padding` | `number` | `0` | Pixel padding shared by all boxes. |
-| `clamp` | `boolean` | `true` | Shared bounds-clamping behavior. |
-
-Example:
-
-```json
-{
-  "imagePath": "scene.png",
-  "outputDir": "scene-crops",
-  "coordinateSpace": "pixel",
-  "boxes": [
-    { "label": "title", "box": [10, 20, 180, 80] },
-    { "label": "button", "box": [220, 300, 380, 360] }
-  ]
-}
-```
-
-The tool starts with fail-fast behavior: if one box is invalid, the call fails instead of returning partial results.
-
-## Tool: `annotate_bounding_boxes`
-
-Creates an annotated preview image with provided boxes drawn over the source image. The output image keeps the source dimensions and returns resolved box metadata.
-
-Example:
-
-```json
-{
-  "imagePath": "scene.png",
-  "outputPath": "scene-annotated.png",
-  "coordinateSpace": "pixel",
-  "boxes": [
-    { "label": "target", "box": [50, 40, 250, 180] }
-  ]
-}
-```
-
-Use this to verify coordinate-space, origin, or box-order assumptions before making visual claims.
-
-## Tool: `sample_colors`
-
-Samples exact pixel or patch colors at provided points in a source image. Use it when CSS-level color precision matters.
-
-Example:
-
-```json
-{
-  "imagePath": "scene.png",
-  "coordinateSpace": "pixel",
-  "patchSize": 3,
-  "points": [
-    { "label": "header-bg", "point": [130, 40] },
-    { "label": "cta-button", "point": [620, 340] }
-  ]
-}
-```
-
-The tool returns resolved pixel points plus RGB, hex, OKLab, patch size, sampled pixel count, and patch mean hex values. Palette and dominant-color discovery stay outside the point-sampling contract.
-
-## Tool: `crop_around_point`
-
-Crops a region centered around a provided point. The call requires an explicit crop size through either `radius` or `size`.
-
-Example with radius:
-
-```json
-{
-  "imagePath": "scene.png",
-  "point": [500, 500],
-  "radius": 80,
-  "outputPath": "scene-point.png"
-}
-```
-
-Example with explicit size:
-
-```json
-{
-  "imagePath": "scene.png",
-  "point": [120, 90],
-  "size": { "width": 60, "height": 40 },
-  "coordinateSpace": "pixel"
-}
-```
-
-The coordinate options match `crop_bounding_box`.
-
-### Normalized visual-primitive box
-
-```json
-{
-  "imagePath": "scene.png",
-  "box": [120, 80, 420, 360]
-}
-```
-
-This uses the default `coordinateSpace: "normalized-999"`, matching the visual-primitives paper convention.
-
-### Pixel box
-
-```json
-{
-  "imagePath": "scene.png",
-  "box": [50, 40, 250, 180],
-  "coordinateSpace": "pixel",
-  "outputPath": "scene-object.png"
-}
-```
-
-### Bottom-left coordinate system
-
-```json
-{
-  "imagePath": "plot.png",
-  "box": [10, 20, 60, 80],
-  "coordinateSpace": "pixel",
-  "origin": "bottom-left",
-  "boxOrder": "left-bottom-right-top"
-}
-```
-
-The tool converts this to the top-left pixel rectangle required by image processing libraries.
-
-### Strict bounds checking
-
-```json
-{
-  "imagePath": "scene.png",
-  "box": [-10, 0, 100, 100],
-  "coordinateSpace": "pixel",
-  "clamp": false
-}
-```
-
-This fails because the box exceeds image bounds.
-
-## Returned Metadata
-
-The tool returns text containing the output path and resolved crop rectangle. Structured details include:
-
-- `imagePath`
-- `outputPath`
-- `source.width`
-- `source.height`
-- `source.format`
-- `input.box`
-- `input.coordinateSpace`
-- `input.origin`
-- `input.boxOrder`
-- `input.padding`
-- `input.clamp`
-- `resolvedPixelBox`
-- `unclampedPixelBox`
-- `clamped`
+1. Remove the legacy package from Pi settings or uninstall it with the source identity previously used.
+2. Install `npm:@mapleluvr/visual-primitives@0.2.0` or the pinned Git tag shown above.
+3. Replace old extension tool calls with `vp crop`, `vp crop-multi`, `vp annotate`, `vp point`, and `vp colors`.
+4. For agent execution, use the package-local launcher described by `using-visual-primitives`; do not assume `vp` is on `PATH`.
+5. Keep masked oracle diff work inside the frontend replication Skill family.
 
 ## Development
 
-Run tests:
-
 ```bash
-npm test
-```
-
-Run syntax checks:
-
-```bash
+npm ci --ignore-scripts
 npm run check
+npm test
+npm run package:smoke
+npm audit --audit-level=high
 ```
 
-The tests generate temporary PNG fixtures with `sharp.create()`, so the repository does not need binary fixture images.
+`npm run package:smoke` creates and installs a temporary tarball, invokes both aliases and all five commands on a generated PNG, validates all six Skills, runs the package-local launcher with package bins removed from `PATH`, and verifies frontend helper ownership.
+
+CI runs on Ubuntu, Windows, and macOS with Node 22.18.0 and Node 24.x. Publishing is tag-gated and uses npm Trusted Publishing with provenance. First-publication prerequisites, restart behavior, and the separately authorized live steps are documented in [RELEASE.md](RELEASE.md). Creating or pushing a release tag is a separate authorized release action; ordinary commits do not publish the package.
 
 ## License
 
-MIT
+[MIT](LICENSE)

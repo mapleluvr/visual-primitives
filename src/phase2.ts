@@ -36,6 +36,7 @@ export interface AnnotateBoundingBoxesDetails {
     width: number;
     height: number;
     format?: string;
+    orientation?: number;
   };
   boxes: Array<Pick<CropBoundingBoxDetails, "resolvedPixelBox" | "unclampedPixelBox" | "clamped"> & { index: number; label?: string }>;
 }
@@ -66,6 +67,7 @@ export interface SampleColorsDetails {
     width: number;
     height: number;
     format?: string;
+    orientation?: number;
   };
   input: {
     coordinateSpace: CoordinateSpace;
@@ -77,6 +79,7 @@ export interface SampleColorsDetails {
     label?: string;
     inputPoint: [number, number];
     resolvedPixelPoint: { x: number; y: number };
+    clamped: boolean;
     rgb: { r: number; g: number; b: number };
     alpha: number;
     hex: string;
@@ -102,7 +105,7 @@ function normalizeToolPath(path: string, cwd: string): string {
 }
 
 function slugifyLabel(label: string): string {
-  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const slug = label.toLowerCase().replace(/[^\p{Letter}\p{Number}]+/gu, "-").replace(/^-+|-+$/g, "");
   return slug || "box";
 }
 
@@ -116,14 +119,14 @@ function defaultMultiCropOutputPath(imagePath: string, input: CropMultipleBoundi
   const base = basename(resolvedImagePath, parsedExt);
   const suffix = label ? `-${slugifyLabel(label)}` : "";
   const fileName = `${base}.crop-${String(index + 1).padStart(3, "0")}${suffix}-${hashInput({ imagePath, input, index, label })}.png`;
-  return input.outputDir ? join(input.outputDir, fileName) : join(dirname(resolvedImagePath), fileName);
+  return input.outputDir ? join(input.outputDir, fileName) : join(cwd, fileName);
 }
 
 function defaultAnnotationOutputPath(imagePath: string, input: AnnotateBoundingBoxesInput, cwd: string): string {
   const resolvedImagePath = normalizeToolPath(imagePath, cwd);
   const parsedExt = extname(resolvedImagePath);
   const base = basename(resolvedImagePath, parsedExt);
-  return join(dirname(resolvedImagePath), `${base}.annotated-${hashInput({ imagePath, input })}.png`);
+  return join(cwd, `${base}.annotated-${hashInput({ imagePath, input })}.png`);
 }
 
 function escapeXml(value: string): string {
@@ -132,6 +135,24 @@ function escapeXml(value: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function estimateTextWidth(text: string, fontSize: number): number {
+  let units = 0;
+  for (const char of text) {
+    units += char.codePointAt(0)! > 0xff ? 1 : 0.62;
+  }
+  return Math.ceil(units * fontSize);
+}
+
+function contrastingTextColor(color: string): string {
+  const match = color.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!match) return "#ffffff";
+  const hex = match[1].length === 3 ? [...match[1]].map((c) => c + c).join("") : match[1];
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6 ? "#000000" : "#ffffff";
 }
 
 function assertFinitePoint(point: [number, number]): void {
@@ -162,12 +183,14 @@ function resolvePixelPoint(
   image: { width: number; height: number },
   coordinateSpace: CoordinateSpace,
   origin: CoordinateOrigin,
-): { x: number; y: number } {
+): { x: number; y: number; clamped: boolean } {
   assertFinitePoint(point);
-  const x = clampPixelIndex(scalePointCoordinate(point[0], image.width, coordinateSpace), image.width);
+  const rawX = scalePointCoordinate(point[0], image.width, coordinateSpace);
+  const x = clampPixelIndex(rawX, image.width);
   const yInSpace = scalePointCoordinate(point[1], image.height, coordinateSpace);
-  const y = origin === "bottom-left" ? image.height - 1 - yInSpace : yInSpace;
-  return { x, y: clampPixelIndex(y, image.height) };
+  const rawY = origin === "bottom-left" ? image.height - 1 - yInSpace : yInSpace;
+  const y = clampPixelIndex(rawY, image.height);
+  return { x, y, clamped: x !== rawX || y !== rawY };
 }
 
 function toHex(rgb: { r: number; g: number; b: number }): string {
@@ -235,7 +258,7 @@ function pointBox(input: CropAroundPointInput): BoundingBoxTuple {
     return [x - halfWidth, y - halfHeight, x + halfWidth, y + halfHeight];
   }
 
-  throw new Error("crop_around_point requires an explicit radius or size");
+  throw new Error("crop-around-point requires an explicit radius or size");
 }
 
 export async function cropMultipleBoundingBoxes(
@@ -313,12 +336,26 @@ export async function annotateBoundingBoxes(
   const outputPath = input.outputPath ? normalizeToolPath(input.outputPath, options.cwd) : defaultAnnotationOutputPath(input.imagePath, input, options.cwd);
   await mkdir(dirname(outputPath), { recursive: true });
 
+  const fontSize = Math.max(12, Math.round(Math.min(metadata.width, metadata.height) / 40));
+  const strokeWidth = Math.max(2, Math.round(fontSize / 8));
+  const chipHeight = Math.round(fontSize * 1.6);
+  const chipPadX = Math.round(fontSize * 0.45);
+
   const svg = `<svg width="${metadata.width}" height="${metadata.height}" xmlns="http://www.w3.org/2000/svg">
 ${boxes.map((item) => {
   const box = item.resolvedPixelBox;
   const color = escapeXml(item.color);
-  const label = item.label ? `<text x="${box.left}" y="${Math.max(12, box.top - 4)}" fill="${color}" font-size="12" font-family="sans-serif">${escapeXml(item.label)}</text>` : "";
-  return `<rect x="${box.left}" y="${box.top}" width="${box.width}" height="${box.height}" fill="none" stroke="${color}" stroke-width="2"/>${label}`;
+  const rect = `<rect x="${box.left}" y="${box.top}" width="${box.width}" height="${box.height}" fill="none" stroke="${color}" stroke-width="${strokeWidth}"/>`;
+  if (!item.label) return rect;
+
+  const chipWidth = estimateTextWidth(item.label, fontSize) + chipPadX * 2;
+  const chipLeft = Math.max(0, Math.min(box.left, metadata.width! - chipWidth));
+  const aboveTop = box.top - chipHeight - Math.ceil(strokeWidth / 2);
+  const chipTop = aboveTop >= 0 ? aboveTop : box.top + Math.ceil(strokeWidth / 2);
+  const textY = chipTop + Math.round(chipHeight * 0.72);
+  const chip = `<rect x="${chipLeft}" y="${chipTop}" width="${chipWidth}" height="${chipHeight}" rx="${Math.round(fontSize / 4)}" fill="${color}"/>`
+    + `<text x="${chipLeft + chipPadX}" y="${textY}" fill="${contrastingTextColor(item.color)}" font-size="${fontSize}" font-family="sans-serif">${escapeXml(item.label)}</text>`;
+  return `${rect}${chip}`;
 }).join("\n")}
 </svg>`;
 
@@ -334,6 +371,7 @@ ${boxes.map((item) => {
       width: metadata.width,
       height: metadata.height,
       format: metadata.format,
+      ...(metadata.orientation !== undefined ? { orientation: metadata.orientation } : {}),
     },
     boxes: boxes.map(({ color: _color, ...item }) => item),
   };
@@ -424,7 +462,8 @@ export async function sampleColors(
       index,
       label: item.label,
       inputPoint: point,
-      resolvedPixelPoint: resolved,
+      resolvedPixelPoint: { x: resolved.x, y: resolved.y },
+      clamped: resolved.clamped,
       rgb,
       alpha: pixel.alpha,
       hex: toHex(rgb),
@@ -452,6 +491,7 @@ export async function sampleColors(
       width: metadata.width,
       height: metadata.height,
       format: metadata.format,
+      ...(metadata.orientation !== undefined ? { orientation: metadata.orientation } : {}),
     },
     input: {
       coordinateSpace,
