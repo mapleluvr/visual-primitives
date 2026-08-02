@@ -98,6 +98,26 @@ Package 包含六个可发现的 Skills：
 
 独立的图像和截图证据任务使用 `using-visual-primitives`。包含 oracle intake、实现轮次、masked scoring、verdict 或交付审查时使用 `frontend-replication`。专用 Skills 引用通用命令和坐标指南，不重复定义它们。
 
+## 前端复现示例
+
+以下示例展示 `frontend-replication` -> `inline-replication` 工作流的一次 render。它们展示的是 replication Skills，而不是 `vp` CLI 自动生成的结果：CLI 提供可检查的图像证据，Skills 负责实现与反馈循环。
+
+### 简单任务：分析仪表盘
+
+Oracle 是一个规则的仪表盘布局，包含 sidebar、KPI 行、chart cards 和 transactions table。
+
+![分析仪表盘 oracle 与单次 render 对照](docs/visual-primitives/examples/pulse-side-by-side.png)
+
+*左：oracle mockup。右：单次 render。*
+
+### 复杂任务：密集桌面 UI
+
+Oracle 是一张网易云音乐桌面端真实截图（`1448x940`），包含三大区域、密集中文排版、icons、badges、对齐的表格列和浮动进度条。
+
+![网易云音乐 oracle 与单次 render 对照](docs/visual-primitives/examples/netease-side-by-side.png)
+
+*左：oracle 截图。右：单次 render。完整分辨率的 oracle、render 和对照文件都位于 [`docs/visual-primitives/examples/`](docs/visual-primitives/examples/) 下。*
+
 ## 前端工作流 Helper
 
 `masked-oracle-diff` 归 `frontend-replication` 工作流所有。它不是 `vp` 子命令，不是 npm binary，不是通用 core export，也不属于 `using-visual-primitives` 的职责。

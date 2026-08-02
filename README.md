@@ -98,6 +98,26 @@ The package includes six discoverable Skills:
 
 Use `using-visual-primitives` for standalone image and screenshot evidence. Use `frontend-replication` when the task includes oracle intake, implementation rounds, masked scoring, verdicts, or delivery review. Specialized Skills reference the generic command and coordinate guidance instead of duplicating it.
 
+## Frontend Replication Examples
+
+These examples show the `frontend-replication` -> `inline-replication` workflow in a single-pass render. They demonstrate the replication Skills, not automatic output from the `vp` CLI: the CLI supplies inspectable image evidence, while the Skills own implementation and feedback.
+
+### Simple task: analytics dashboard
+
+The oracle is a regular dashboard layout with a sidebar, KPI row, chart cards, and a transactions table.
+
+![Analytics dashboard oracle next to the single-pass render](docs/visual-primitives/examples/pulse-side-by-side.png)
+
+*Left: oracle mockup. Right: single-pass render.*
+
+### Complex task: dense desktop UI
+
+The oracle is a real NetEase Cloud Music desktop screenshot (`1448x940`) with three major regions, dense Chinese typography, icons, badges, aligned table columns, and a floating progress bar.
+
+![NetEase Cloud Music oracle next to the single-pass render](docs/visual-primitives/examples/netease-side-by-side.png)
+
+*Left: oracle screenshot. Right: single-pass render. Full-resolution oracle, render, and side-by-side files are available under [`docs/visual-primitives/examples/`](docs/visual-primitives/examples/).*
+
 ## Frontend Workflow Helper
 
 `masked-oracle-diff` remains owned by the frontend replication workflow. It is not a `vp` command, npm binary, generic core export, or responsibility of `using-visual-primitives`.
