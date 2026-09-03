@@ -6,7 +6,7 @@
   <img alt="Platform: Cross-platform" src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-0078D4">
   <img alt="Node.js: 22.18 or newer" src="https://img.shields.io/badge/Node.js-%3E%3D22.18-339933">
   <img alt="Version: 0.2.0" src="https://img.shields.io/badge/version-0.2.0-F59E0B">
-  <img alt="Pi Package: Skills only" src="https://img.shields.io/badge/Pi%20Package-Skills--only-6366F1">
+  <img alt="Agent Skills: Portable" src="https://img.shields.io/badge/Agent%20Skills-portable-6366F1">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2F855A">
 </p>
 
@@ -19,7 +19,7 @@
   &middot;
   <a href="#visual-evidence--replication-workflows"><strong>Workflows</strong></a>
   &middot;
-  <a href="#pi-skill-set"><strong>Skills</strong></a>
+  <a href="#skill-set"><strong>Skills</strong></a>
   &middot;
   <a href="#evidence-model"><strong>Evidence Model</strong></a>
   &middot;
@@ -106,7 +106,8 @@ or `stdin`, preserving legacy tool payload schemas and default normalized coordi
   any coordinate or box is invalid, the operation aborts cleanly without partial files.
 - **CSS-level color precision**: `vp colors` samples points or odd $N \times N$ pixel patches,
   returning RGB, Hex, OKLab color space coordinates, and patch mean statistics for design matching.
-- **Discoverable Pi Skill Set**: six packaged agent skills covering standalone visual evidence,
+- **Discoverable Agent Skill Set**: six portable agent skills (compatible across agent
+  harnesses including Pi, Claude Code, Cursor, and others) covering standalone visual evidence,
   oracle intake, parent-agent loops, subagent orchestration, verdict synthesis, and delivery review.
 - **Masked Oracle Diff engine**: dedicated workflow helper comparing oracle reference designs
   against rendered implementations, strictly isolating code-drawable UI from approved image exclusions.
@@ -120,7 +121,7 @@ or `stdin`, preserving legacy tool payload schemas and default normalized coordi
 - Node.js 22.18 or newer
 - Linux, macOS, or Windows
 - Interactive terminal or headless automation environment
-- Optional: [Pi coding agent](https://github.com/earendil-works/pi) for skill installation and agent-driven replication
+- Optional: Any coding agent harness supporting Agent Skills (e.g. [Pi](https://github.com/earendil-works/pi), Claude Code, Cursor) for agent-driven replication
 
 ## Installation
 
@@ -136,9 +137,10 @@ visual-primitives --version
 
 The two aliases are completely equivalent.
 
-### Pi Skill Set Installation
+### Install The Skill Set In Pi
 
-Install the package directly into Pi to enable the six visual replication and evidence skills:
+Skills follow the open Agent Skills standard and are portable across agent harnesses.
+In Pi, install the package directly to load the six visual replication and evidence skills:
 
 ```bash
 # Pinned npm version
@@ -353,9 +355,11 @@ The visual evidence tools (`vp annotate`, `vp crop`, `masked-oracle-diff`) ident
 4. **Fail-Fast Batching**: In `crop-multi`, if any box fails validation or exceeds bounds under `--no-clamp`, zero files are written and the process exits with code `2` or `1`.
 5. **No Blind State**: Commands do not create background locks, temporary database records, or hidden sessions. Output paths are deterministic or explicitly specified.
 
-## Pi Skill Set
+## Skill Set
 
-The package includes six discoverable skills for agent-assisted visual engineering:
+The package includes six discoverable skills for agent-assisted visual engineering.
+Built on the open Agent Skills standard, they are portable across coding agent harnesses
+(such as Pi, Claude Code, Cursor, and custom agent harnesses):
 
 | Skill | Role | Primary Use Case |
 | --- | --- | --- |

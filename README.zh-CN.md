@@ -6,7 +6,7 @@
   <img alt="Platform: 跨平台" src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-0078D4">
   <img alt="Node.js: 22.18 或更高版本" src="https://img.shields.io/badge/Node.js-%3E%3D22.18-339933">
   <img alt="Version: 0.2.0" src="https://img.shields.io/badge/version-0.2.0-F59E0B">
-  <img alt="Pi Package: 仅 Skills" src="https://img.shields.io/badge/Pi%20Package-Skills--only-6366F1">
+  <img alt="Agent Skills: 跨 Harness 通用" src="https://img.shields.io/badge/Agent%20Skills-%E8%B7%A8Harness%E9%80%9A%E7%94%A8-6366F1">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2F855A">
 </p>
 
@@ -19,7 +19,7 @@
   &middot;
   <a href="#视觉证据与复现工作流"><strong>工作流</strong></a>
   &middot;
-  <a href="#pi-skill-set"><strong>Skills</strong></a>
+  <a href="#skill-set"><strong>Skills</strong></a>
   &middot;
   <a href="#证据模型"><strong>证据模型</strong></a>
   &middot;
@@ -93,7 +93,7 @@ vp colors screenshot.png --point "header-bg:80,50" --patch 3
 - **灵活的坐标几何配置**：支持标准左上原点（`top-left`）或笛卡尔左下原点（`bottom-left`，y 轴向上），支持 `left-top-right-bottom`（`ltrb`）或 `left-bottom-right-top`（`lbrt`）元组。
 - **原子级快速失败批量处理**：`vp crop-multi` 单次调用即可批量裁剪多个命名区域；若任意坐标或框体非法，立即干净中止，不产生部分残留文件。
 - **CSS 级高精色彩采样**：`vp colors` 支持采样单像素或奇数 $N \times N$ 像素色块，返回 RGB、Hex、OKLab 空间坐标及色块均值统计，辅助精准还原设计样式。
-- **可发现的 Pi Skill Set**：提供六个专用 Agent Skills，覆盖通用视觉证据提取、Oracle Intake、单 Agent 循环、多子 Agent 编排、反馈综合与最终交付审查。
+- **跨 Harness 通用的 Agent Skill Set**：提供六个遵循开放 Agent Skills 标准的通用技能（可在各类 Agent Harness 中通用，包括 Pi、Claude Code、Cursor 等），覆盖通用视觉证据提取、Oracle Intake、单 Agent 循环、多子 Agent 编排、反馈综合与最终交付审查。
 - **Masked Oracle Diff 引擎**：专用工作流辅助工具，对比 Oracle 参考设计与渲染实现，严格将纯代码绘制区域与获批的非代码图像排除项隔离。
 - **双输入模式**：为交互式 Shell 提供符合人体工程学的 CLI flags，同时支持 `--json <file|->` 以便接入机器流水线与自动化脚本。
 - **可预测的机器交互契约**：`stdout` 输出版本化 JSON 回执，`stderr` 输出人类可读摘要（可用 `--quiet` 抑制），具备固定退出码（`0` 成功，`1` 运行时/IO 错误，`2` 参数/校验错误）。
@@ -103,7 +103,7 @@ vp colors screenshot.png --point "header-bg:80,50" --patch 3
 - Node.js 22.18 或更高版本
 - Linux、macOS 或 Windows
 - 交互式终端或无头自动化环境
-- 可选：[Pi coding agent](https://github.com/earendil-works/pi)（用于安装 Skills 及驱动 Agent 自动化复现）
+- 可选：支持 Agent Skills 的任意 Coding Agent Harness（如 [Pi](https://github.com/earendil-works/pi)、Claude Code、Cursor 等），用于驱动 Agent 自动化复现
 
 ## 安装
 
@@ -119,9 +119,9 @@ visual-primitives --version
 
 这两个命令别名完全等价。
 
-### Pi Skill Set 安装
+### 在 Pi 中安装 Skill Set
 
-将 package 直接安装到 Pi 中，启用六个视觉复现与证据 Skills：
+Skills 遵循开放的 Agent Skills 标准，跨各类 Agent Harness 通用。在 Pi 中，可直接通过内置命令安装以启用六个视觉复现与证据 Skills：
 
 ```bash
 # 安装固定的 npm 版本
@@ -327,9 +327,9 @@ Oracle 是一张真实网易云音乐桌面客户端截图（`1448x940`）——
 4. **快速失败机制**：在 `crop-multi` 中，若任意一个框校验失败或在 `--no-clamp` 下越界，将零写入文件并直接以退出码 `2` 或 `1` 退出。
 5. **无隐式状态**：命令不依赖或产生后台文件锁、临时数据库或隐藏会话；输出路径完全由显式配置或确定性算法决定。
 
-## Pi Skill Set
+## Skill Set
 
-本 package 包含六个可被 Agent 发现的专用 Skills：
+本 package 包含六个遵循开放 Agent Skills 标准的通用 Skills，可在各类 Coding Agent Harness（如 Pi、Claude Code、Cursor 以及自定义 Agent 系统）中通用：
 
 | Skill | 定位 | 主要用途 |
 | --- | --- | --- |
