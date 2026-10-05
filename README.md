@@ -1,32 +1,29 @@
-<h1 align="center">visual-primitives</h1>
+![visual-primitives](assets/visual-primitives-title.png)
 
-<p align="center"><strong>Evidence-bound Visual Primitives and Frontend Replication Workflows.</strong></p>
+<div align="center">
 
-<p align="center">
-  <img alt="Platform: Cross-platform" src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-0078D4">
-  <img alt="Node.js: 22.18 or newer" src="https://img.shields.io/badge/Node.js-%3E%3D22.18-339933">
-  <img alt="Version: 0.2.0" src="https://img.shields.io/badge/version-0.2.0-F59E0B">
-  <img alt="Agent Skills: Portable" src="https://img.shields.io/badge/Agent%20Skills-portable-6366F1">
-  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2F855A">
-</p>
+*Explicit coordinates, inspectable image evidence, and one repeatable replication workflow.*
 
-<p align="center">
-  <a href="#getting-started"><strong>Getting Started</strong></a>
-  &middot;
-  <a href="#key-features"><strong>Features</strong></a>
-  &middot;
-  <a href="#command-line"><strong>CLI</strong></a>
-  &middot;
-  <a href="#visual-evidence--replication-workflows"><strong>Workflows</strong></a>
-  &middot;
-  <a href="#skill-set"><strong>Skills</strong></a>
-  &middot;
-  <a href="#evidence-model"><strong>Evidence Model</strong></a>
-  &middot;
-  <a href="#documentation"><strong>Documentation</strong></a>
-  &middot;
-  <a href="README.zh-CN.md"><strong>中文文档</strong></a>
-</p>
+<img src="https://img.shields.io/badge/version-0.2.0-EB0404?labelColor=181818" alt="Version: 0.2.0">
+<img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-181818" alt="platform: Linux | macOS | Windows">
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-FDFDFD?labelColor=181818" alt="License: MIT"></a>
+
+<br>
+<br>
+
+<a href="#quick-start">Quick Start</a> ｜
+<a href="#core-idea">Core Idea</a> ｜
+<a href="#key-features">Features</a> ｜
+<a href="#command-line">CLI</a> ｜
+<a href="#visual-evidence--replication-workflows">Examples</a> ｜
+<a href="#project-structure">Structure</a> ｜
+<a href="#documentation">Docs</a>
+
+<a href="README.zh-CN.md">中文</a>
+
+</div>
+
+---
 
 `@mapleluvr/visual-primitives` ships one unified package containing:
 
@@ -43,6 +40,175 @@ operation, prints a structured JSON receipt to `stdout`, and exits immediately.
 > detection, OCR, segmentation, automatic box generation, or blind UI inference. Coordinates are
 > provided by human users or reasoning agents, and direct visual inspection remains the authoritative
 > interpreter of all generated artifacts.
+
+## Core Idea
+
+<a id="evidence-model"></a>
+
+`visual-primitives` treats spatial evidence as a verifiable contract:
+
+1. **Normalized vs. Pixel Coordinates**: Normalized coordinates (`0..999`) provide resolution-independent references across varied device viewports. Pixel coordinates provide exact 1:1 hardware buffer mapping.
+2. **Deterministic Resolution**: Bounding boxes undergo scaling, origin conversion, optional padding, and clamping in a single deterministic pipeline.
+3. **Clamping Transparency**: Every receipt exposes both `resolvedPixelBox` (the actual crop rectangle) and `unclampedPixelBox`, with a boolean `clamped` flag indicating whether any boundary was clipped.
+4. **Fail-Fast Batching**: In `crop-multi`, if any box fails validation or exceeds bounds under `--no-clamp`, zero files are written and the process exits with code `2` or `1`.
+5. **No Blind State**: Commands do not create background locks, temporary database records, or hidden sessions. Output paths are deterministic or explicitly specified.
+
+## Key Features
+
+- **Evidence-bound inspection**: generate concrete, pixel-accurate crops and previews from explicit
+  coordinates to anchor visual reasoning in verifiable facts rather than hallucination.
+- **Pure local & zero daemon**: standalone CLI powered by `sharp` and native `libvips`; executes
+  in-process with zero background services, zero network calls, and instant startup.
+- **Dual coordinate spaces**: supports paper-style normalized `0..999` thousandths (following
+  *Thinking with Visual Primitives*) as well as direct pixel coordinates.
+- **Flexible coordinate geometry**: supports standard top-left origin or Cartesian bottom-left
+  (y growing upward), with `left-top-right-bottom` (`ltrb`) or `left-bottom-right-top` (`lbrt`) tuples.
+- **Atomic fail-fast batching**: `vp crop-multi` crops multiple labeled regions in one call; if
+  any coordinate or box is invalid, the operation aborts cleanly without partial files.
+- **CSS-level color precision**: `vp colors` samples points or odd $N \times N$ pixel patches,
+  returning RGB, Hex, OKLab color space coordinates, and patch mean statistics for design matching.
+- **Discoverable Agent Skill Set**: six portable agent skills (compatible across agent
+  harnesses including Pi, Claude Code, Cursor, and others) covering standalone visual evidence,
+  oracle intake, parent-agent loops, subagent orchestration, verdict synthesis, and delivery review.
+- **Masked Oracle Diff engine**: dedicated workflow helper comparing oracle reference designs
+  against rendered implementations, strictly isolating code-drawable UI from approved image exclusions.
+- **Dual input modes**: ergonomic CLI flags for interactive shell use, plus `--json <file|->`
+  for machine pipelines and programmatic invocation.
+- **Predictable machine contracts**: versioned JSON receipts on `stdout`, human summaries on
+  `stderr` (suppressible with `--quiet`), and fixed exit codes (`0` success, `1` runtime/IO, `2` usage).
+
+## Quick Start
+
+### Requirements
+
+- Node.js 22.18 or newer
+- Linux, macOS, or Windows
+- Interactive terminal or headless automation environment
+- Optional: Any coding agent harness supporting Agent Skills (e.g. [Pi](https://github.com/earendil-works/pi), Claude Code, Cursor) for agent-driven replication
+
+### Installation
+
+#### CLI Installation (npm)
+
+Install both binary aliases (`vp` and `visual-primitives`) globally from npm:
+
+```bash
+npm install -g @mapleluvr/visual-primitives
+vp --help
+visual-primitives --version
+```
+
+The two aliases are completely equivalent.
+
+#### Install The Skill Set In Pi
+
+Skills follow the open Agent Skills standard and are portable across agent harnesses.
+In Pi, install the package directly to load the six visual replication and evidence skills:
+
+```bash
+# Pinned npm version
+pi install npm:@mapleluvr/visual-primitives@0.2.0
+
+# Or pinned Git release tag
+pi install git:github.com/mapleluvr/visual-primitives@v0.2.0
+```
+
+> [!NOTE]
+> The Pi package manifest exposes **Skills only**. It intentionally does not register legacy
+> extension tools. Because Pi package installation does not guarantee npm binaries are on the
+> system `PATH`, agent skills automatically invoke the bundled CLI through `skills/_shared/run-vp.mjs`.
+> Humans may use the globally installed `vp` binary.
+
+### Getting Started
+
+Create a working directory and copy a screenshot at least `1440 × 900` into it as `screenshot.png` before running these coordinate examples. For other dimensions or layouts, adjust the boxes and points first; these are supplied coordinates, not detected elements.
+
+```bash
+mkdir vp-demo
+cd vp-demo
+```
+
+#### 1. Annotate Assumptions on a Preview
+
+Draw labeled bounding boxes over the source image to verify coordinate assumptions before drawing conclusions:
+
+```bash
+vp annotate screenshot.png \
+  --box "header:0,0,1440,80:#00aaff" \
+  --box "sidebar:0,80,260,900:#ff0055" \
+  --box "content:260,80,1440,900" \
+  --out preview.png
+```
+
+#### 2. Crop a Focused Region
+
+Crop an exact rectangular bounding box for detailed visual inspection:
+
+```bash
+vp crop screenshot.png --box "40,30,240,180" --out header-card.png
+```
+
+For normalized paper-style coordinates (0..999 thousandths):
+
+```bash
+vp crop screenshot.png --box "28,33,167,200" --space normalized-999 --out header-card.png
+```
+
+#### 3. Batch-Crop Multiple Regions
+
+Crop multiple labeled areas in a single atomic call. Files are named deterministically using the provided labels:
+
+```bash
+vp crop-multi screenshot.png \
+  --out-dir ./crops \
+  --box "logo:20,20,120,60" \
+  --box "search-bar:160,20,600,60" \
+  --box "user-avatar:1380,20,1420,60"
+```
+
+#### 4. Crop Around a Point of Interest
+
+Extract a square or rectangular neighborhood centered on an explicit coordinate:
+
+```bash
+# Using radius (crops a 160x160 square centered at 500, 300)
+vp point screenshot.png --point "500,300" --radius 80 --out target-center.png
+
+# Using explicit width x height
+vp point screenshot.png --point "500,300" --size 120x80 --out target-rect.png
+```
+
+#### 5. Sample CSS and OKLab Colors
+
+Sample exact pixel colors or mean patch colors to achieve precise CSS styling:
+
+```bash
+vp colors screenshot.png \
+  --patch 3 \
+  --point "bg:10,10" \
+  --point "brand-red:420,280" \
+  --point "text-primary:100,50"
+```
+
+#### 6. Pipeline with JSON Input
+
+Use `--json` to pass complete structured payloads from files or `stdin`:
+
+```bash
+vp crop --json crop-spec.json
+cat crop-spec.json | vp crop --json -
+```
+
+```json
+{
+  "imagePath": "screenshot.png",
+  "box": [40, 30, 240, 180],
+  "coordinateSpace": "pixel",
+  "outputPath": "header.png"
+}
+```
+
+### Read the Receipt
 
 ```bash
 vp annotate screenshot.png --box "header:40,30,240,180" --out annotated.png
@@ -92,157 +258,39 @@ Every successful command writes one structured JSON receipt to `stdout` (with su
 For automated agent or headless workflows, `--json <file|->` accepts full JSON inputs via file
 or `stdin`, preserving legacy tool payload schemas and default normalized coordinates.
 
-## Key Features
+## Command Line
 
-- **Evidence-bound inspection**: generate concrete, pixel-accurate crops and previews from explicit
-  coordinates to anchor visual reasoning in verifiable facts rather than hallucination.
-- **Pure local & zero daemon**: standalone CLI powered by `sharp` and native `libvips`; executes
-  in-process with zero background services, zero network calls, and instant startup.
-- **Dual coordinate spaces**: supports paper-style normalized `0..999` thousandths (following
-  *Thinking with Visual Primitives*) as well as direct pixel coordinates.
-- **Flexible coordinate geometry**: supports standard top-left origin or Cartesian bottom-left
-  (y growing upward), with `left-top-right-bottom` (`ltrb`) or `left-bottom-right-top` (`lbrt`) tuples.
-- **Atomic fail-fast batching**: `vp crop-multi` crops multiple labeled regions in one call; if
-  any coordinate or box is invalid, the operation aborts cleanly without partial files.
-- **CSS-level color precision**: `vp colors` samples points or odd $N \times N$ pixel patches,
-  returning RGB, Hex, OKLab color space coordinates, and patch mean statistics for design matching.
-- **Discoverable Agent Skill Set**: six portable agent skills (compatible across agent
-  harnesses including Pi, Claude Code, Cursor, and others) covering standalone visual evidence,
-  oracle intake, parent-agent loops, subagent orchestration, verdict synthesis, and delivery review.
-- **Masked Oracle Diff engine**: dedicated workflow helper comparing oracle reference designs
-  against rendered implementations, strictly isolating code-drawable UI from approved image exclusions.
-- **Dual input modes**: ergonomic CLI flags for interactive shell use, plus `--json <file|->`
-  for machine pipelines and programmatic invocation.
-- **Predictable machine contracts**: versioned JSON receipts on `stdout`, human summaries on
-  `stderr` (suppressible with `--quiet`), and fixed exit codes (`0` success, `1` runtime/IO, `2` usage).
+| Command | Purpose |
+| --- | --- |
+| `vp crop <image> --box <l,t,r,b> [options]` | Crop one rectangular region from a source image. |
+| `vp crop-multi <image> --box <[label:]l,t,r,b> ...` | Crop multiple labeled regions atomically in one fail-fast call. |
+| `vp annotate <image> --box <[label:]l,t,r,b[:color]> ...` | Draw labeled boxes and outlines on a same-size preview image. |
+| `vp point <image> --point <x,y> (--radius <n> \| --size <WxH>)` | Crop a rectangular region centered on an explicit coordinate. |
+| `vp colors <image> --point <[label:]x,y> ...` | Sample exact pixel or patch colors (RGB, Hex, OKLab, patch mean). |
 
-## Requirements
+### Common Options
 
-- Node.js 22.18 or newer
-- Linux, macOS, or Windows
-- Interactive terminal or headless automation environment
-- Optional: Any coding agent harness supporting Agent Skills (e.g. [Pi](https://github.com/earendil-works/pi), Claude Code, Cursor) for agent-driven replication
+| Option | Values | Default | Description |
+| --- | --- | --- | --- |
+| `-i, --image <path>` | File path | Positional 1 | Source image path (supports PNG, JPEG, WebP, AVIF, TIFF, GIF, SVG). |
+| `-s, --space <space>` | `pixel` \| `normalized-999` | `pixel` | Coordinate interpretation (`px`, `999` aliases accepted). |
+| `--origin <origin>` | `top-left` \| `bottom-left` | `top-left` | Coordinate origin (`bottom-left` means y grows upward). |
+| `--box-order <order>` | `ltrb` \| `lbrt` | `ltrb` | Coordinate order (`left-top-right-bottom` or `left-bottom-right-top`). |
+| `--padding <n>` | Non-negative integer | `0` | Additional pixel margin expanded around resolved boxes. |
+| `--no-clamp` | Flag | Clamping on | Fail on out-of-bounds boxes instead of clipping to image dimensions. |
+| `--json <file\|->` | File path or `-` | None | Read full input payload as JSON; ignores other input flags. |
+| `--compact` | Flag | Pretty | Output compact single-line JSON instead of indented JSON. |
+| `-q, --quiet` | Flag | Verbose | Suppress the human-readable summary line on `stderr`. |
+| `-h, --help` | Flag | None | Display global or command-specific usage help. |
+| `-v, --version` | Flag | None | Display the installed package version. |
 
-## Installation
+### Exit Codes
 
-### CLI Installation (npm)
-
-Install both binary aliases (`vp` and `visual-primitives`) globally from npm:
-
-```bash
-npm install -g @mapleluvr/visual-primitives
-vp --help
-visual-primitives --version
-```
-
-The two aliases are completely equivalent.
-
-### Install The Skill Set In Pi
-
-Skills follow the open Agent Skills standard and are portable across agent harnesses.
-In Pi, install the package directly to load the six visual replication and evidence skills:
-
-```bash
-# Pinned npm version
-pi install npm:@mapleluvr/visual-primitives@0.2.0
-
-# Or pinned Git release tag
-pi install git:github.com/mapleluvr/visual-primitives@v0.2.0
-```
-
-> [!NOTE]
-> The Pi package manifest exposes **Skills only**. It intentionally does not register legacy
-> extension tools. Because Pi package installation does not guarantee npm binaries are on the
-> system `PATH`, agent skills automatically invoke the bundled CLI through `skills/_shared/run-vp.mjs`.
-> Humans may use the globally installed `vp` binary.
-
-## Getting Started
-
-Create a working directory and run through the core visual evidence commands:
-
-```bash
-mkdir vp-demo
-cd vp-demo
-```
-
-### 1. Annotate Assumptions on a Preview
-
-Draw labeled bounding boxes over the source image to verify coordinate assumptions before drawing conclusions:
-
-```bash
-vp annotate screenshot.png \
-  --box "header:0,0,1440,80:#00aaff" \
-  --box "sidebar:0,80,260,900:#ff0055" \
-  --box "content:260,80,1440,900" \
-  --out preview.png
-```
-
-### 2. Crop a Focused Region
-
-Crop an exact rectangular bounding box for detailed visual inspection:
-
-```bash
-vp crop screenshot.png --box "40,30,240,180" --out header-card.png
-```
-
-For normalized paper-style coordinates (0..999 thousandths):
-
-```bash
-vp crop screenshot.png --box "28,33,167,200" --space normalized-999 --out header-card.png
-```
-
-### 3. Batch-Crop Multiple Regions
-
-Crop multiple labeled areas in a single atomic call. Files are named deterministically using the provided labels:
-
-```bash
-vp crop-multi screenshot.png \
-  --out-dir ./crops \
-  --box "logo:20,20,120,60" \
-  --box "search-bar:160,20,600,60" \
-  --box "user-avatar:1380,20,1420,60"
-```
-
-### 4. Crop Around a Point of Interest
-
-Extract a square or rectangular neighborhood centered on an explicit coordinate:
-
-```bash
-# Using radius (crops a 160x160 square centered at 500, 300)
-vp point screenshot.png --point "500,300" --radius 80 --out target-center.png
-
-# Using explicit width x height
-vp point screenshot.png --point "500,300" --size 120x80 --out target-rect.png
-```
-
-### 5. Sample CSS and OKLab Colors
-
-Sample exact pixel colors or mean patch colors to achieve precise CSS styling:
-
-```bash
-vp colors screenshot.png \
-  --patch 3 \
-  --point "bg:10,10" \
-  --point "brand-red:420,280" \
-  --point "text-primary:100,50"
-```
-
-### 6. Pipeline with JSON Input
-
-Use `--json` to pass complete structured payloads from files or `stdin`:
-
-```bash
-vp crop --json crop-spec.json
-cat crop-spec.json | vp crop --json -\n```
-
-```json
-{
-  "imagePath": "screenshot.png",
-  "box": [40, 30, 240, 180],
-  "coordinateSpace": "pixel",
-  "outputPath": "header.png"
-}
-```
+| Exit Code | Meaning | Standard Output | Standard Error |
+| :---: | --- | --- | --- |
+| `0` | Success | Structured JSON receipt | One-line summary (unless `--quiet`) |
+| `1` | Runtime / Image / IO failure | Empty | Descriptive error message |
+| `2` | Usage / Validation error | Empty | Help hint or schema error message |
 
 ## Visual Evidence & Replication Workflows
 
@@ -311,50 +359,6 @@ Even with this extreme density, the single-pass render holds together with remar
 
 The visual evidence tools (`vp annotate`, `vp crop`, `masked-oracle-diff`) identify these exact discrepancies, enabling targeted feedback in the next refinement loop.
 
-## Command Line
-
-| Command | Purpose |
-| --- | --- |
-| `vp crop <image> --box <l,t,r,b> [options]` | Crop one rectangular region from a source image. |
-| `vp crop-multi <image> --box <[label:]l,t,r,b> ...` | Crop multiple labeled regions atomically in one fail-fast call. |
-| `vp annotate <image> --box <[label:]l,t,r,b[:color]> ...` | Draw labeled boxes and outlines on a same-size preview image. |
-| `vp point <image> --point <x,y> (--radius <n> \| --size <WxH>)` | Crop a rectangular region centered on an explicit coordinate. |
-| `vp colors <image> --point <[label:]x,y> ...` | Sample exact pixel or patch colors (RGB, Hex, OKLab, patch mean). |
-
-### Common Options
-
-| Option | Values | Default | Description |
-| --- | --- | --- | --- |
-| `-i, --image <path>` | File path | Positional 1 | Source image path (supports PNG, JPEG, WebP, AVIF, TIFF, GIF, SVG). |
-| `-s, --space <space>` | `pixel` \| `normalized-999` | `pixel` | Coordinate interpretation (`px`, `999` aliases accepted). |
-| `--origin <origin>` | `top-left` \| `bottom-left` | `top-left` | Coordinate origin (`bottom-left` means y grows upward). |
-| `--box-order <order>` | `ltrb` \| `lbrt` | `ltrb` | Coordinate order (`left-top-right-bottom` or `left-bottom-right-top`). |
-| `--padding <n>` | Non-negative integer | `0` | Additional pixel margin expanded around resolved boxes. |
-| `--no-clamp` | Flag | Clamping on | Fail on out-of-bounds boxes instead of clipping to image dimensions. |
-| `--json <file\|->` | File path or `-` | None | Read full input payload as JSON; ignores other input flags. |
-| `--compact` | Flag | Pretty | Output compact single-line JSON instead of indented JSON. |
-| `-q, --quiet` | Flag | Verbose | Suppress the human-readable summary line on `stderr`. |
-| `-h, --help` | Flag | None | Display global or command-specific usage help. |
-| `-v, --version` | Flag | None | Display the installed package version. |
-
-### Exit Codes
-
-| Exit Code | Meaning | Standard Output | Standard Error |
-| :---: | --- | --- | --- |
-| `0` | Success | Structured JSON receipt | One-line summary (unless `--quiet`) |
-| `1` | Runtime / Image / IO failure | Empty | Descriptive error message |
-| `2` | Usage / Validation error | Empty | Help hint or schema error message |
-
-## Evidence Model
-
-`visual-primitives` treats spatial evidence as a verifiable contract:
-
-1. **Normalized vs. Pixel Coordinates**: Normalized coordinates (`0..999`) provide resolution-independent references across varied device viewports. Pixel coordinates provide exact 1:1 hardware buffer mapping.
-2. **Deterministic Resolution**: Bounding boxes undergo scaling, origin conversion, optional padding, and clamping in a single deterministic pipeline.
-3. **Clamping Transparency**: Every receipt exposes both `resolvedPixelBox` (the actual crop rectangle) and `unclampedPixelBox`, with a boolean `clamped` flag indicating whether any boundary was clipped.
-4. **Fail-Fast Batching**: In `crop-multi`, if any box fails validation or exceeds bounds under `--no-clamp`, zero files are written and the process exits with code `2` or `1`.
-5. **No Blind State**: Commands do not create background locks, temporary database records, or hidden sessions. Output paths are deterministic or explicitly specified.
-
 ## Skill Set
 
 The package includes six discoverable skills for agent-assisted visual engineering.
@@ -409,6 +413,20 @@ The helper generates a complete diagnostic suite in the run workspace:
 > A clean diff score opens the door to final direct inspection; it does not certify delivery
 > by itself. Direct visual inspection remains mandatory.
 
+## Project Structure
+
+```text
+visual-primitives/
+├── src/                 # CLI, schemas, crops and color processing
+├── skills/              # Six Agent Skills
+│   ├── _shared/         # Bundled CLI launcher
+│   └── frontend-replication/scripts/ # Masked Oracle Diff
+├── scripts/             # Build, package smoke and release checks
+├── tests/               # Synthetic image and CLI contract tests
+├── docs/                # Designs, worked examples and workflow records
+└── assets/              # README title artwork
+```
+
 ## Replication Run Workspace
 
 Replication workflows organize durable artifacts in a standardized run directory structure:
@@ -425,6 +443,17 @@ docs/visual-primitives/runs/<run-id>/
   scripts/       # Run-local capture scripts and manifest configurations
   final/         # Final direct-inspection notes and delivery review artifacts
 ```
+
+## Support and Boundaries
+
+| Capability | Current boundary |
+| --- | --- |
+| Local image processing | Node.js ≥22.18; Linux / macOS / Windows |
+| Coordinate source | Explicit human or agent input; no detection, OCR or automatic segmentation |
+| Pi integration | Skills only; no legacy native extension-tool registration |
+| Masked Oracle Diff | Owned by the frontend replication workflow, not a `vp` subcommand |
+| Scores and acceptance | Diagnostic signals only; final direct visual inspection is still required |
+| Runtime state | No daemon or hidden continuation session; artifacts use declared output paths |
 
 ## Versioning
 
@@ -485,8 +514,16 @@ Publishing is strictly tag-gated using npm Trusted Publishing with cryptographic
 
 - **Strict Schema Admission**: The CLI rejects unknown JSON properties, non-finite coordinates, out-of-range enums, and conflicting parameters.
 - **Fail-Closed Processing**: Invalid image headers, unreadable files, or malformed coordinates terminate execution immediately with descriptive diagnostics.
-- **Sandboxed Operations**: All image operations execute through audited native libraries without shell expansion or arbitrary script evaluation.
+- **Local Image Processing**: Image operations use native libraries without shell expansion or arbitrary script evaluation; this is not a general-purpose security sandbox.
 
 ## License
 
 Licensed under the [MIT License](LICENSE).
+
+---
+
+<div align="center">
+
+**State the coordinates. Keep the evidence. Inspect the result.**
+
+</div>

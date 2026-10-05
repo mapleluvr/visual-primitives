@@ -1,32 +1,29 @@
-<h1 align="center">visual-primitives</h1>
+![visual-primitives](assets/visual-primitives-title.png)
 
-<p align="center"><strong>基于证据的视觉基元与前端复现工作流。</strong></p>
+<div align="center">
 
-<p align="center">
-  <img alt="Platform: 跨平台" src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-0078D4">
-  <img alt="Node.js: 22.18 或更高版本" src="https://img.shields.io/badge/Node.js-%3E%3D22.18-339933">
-  <img alt="Version: 0.2.0" src="https://img.shields.io/badge/version-0.2.0-F59E0B">
-  <img alt="Agent Skills: 跨 Harness 通用" src="https://img.shields.io/badge/Agent%20Skills-%E8%B7%A8Harness%E9%80%9A%E7%94%A8-6366F1">
-  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2F855A">
-</p>
+*显式坐标、可检查的图像证据、可复跑的前端复现工作流。*
 
-<p align="center">
-  <a href="#快速上手"><strong>快速上手</strong></a>
-  &middot;
-  <a href="#核心特性"><strong>核心特性</strong></a>
-  &middot;
-  <a href="#命令行参考"><strong>命令行</strong></a>
-  &middot;
-  <a href="#视觉证据与复现工作流"><strong>工作流</strong></a>
-  &middot;
-  <a href="#skill-set"><strong>Skills</strong></a>
-  &middot;
-  <a href="#证据模型"><strong>证据模型</strong></a>
-  &middot;
-  <a href="#文档"><strong>文档</strong></a>
-  &middot;
-  <a href="README.md"><strong>English</strong></a>
-</p>
+<img src="https://img.shields.io/badge/version-0.2.0-EB0404?labelColor=181818" alt="Version: 0.2.0">
+<img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-181818" alt="platform: Linux | macOS | Windows">
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-FDFDFD?labelColor=181818" alt="License: MIT"></a>
+
+<br>
+<br>
+
+<a href="#快速开始">快速开始</a> ｜
+<a href="#核心思路">核心思路</a> ｜
+<a href="#核心特性">功能</a> ｜
+<a href="#命令行参考">CLI</a> ｜
+<a href="#视觉证据与复现工作流">案例</a> ｜
+<a href="#项目结构">结构</a> ｜
+<a href="#文档">文档</a>
+
+<a href="README.md">English</a>
+
+</div>
+
+---
 
 `@mapleluvr/visual-primitives` 用一个统一版本的 package 提供：
 
@@ -37,6 +34,160 @@
 
 > [!IMPORTANT]
 > `visual-primitives` 将明确的坐标转换为本地视觉证据工件（`.png` 裁剪图、带标签的预览叠加图、精确颜色采样）。它**不执行**目标检测、OCR、图像分割、自动生成边界框或盲目的 UI 推断。坐标由人类用户或具备推理能力的 Agent 提供，直接的视觉检查始终是解释所有生成工件的权威依据。
+
+## 核心思路
+
+<a id="证据模型"></a>
+
+`visual-primitives` 将空间证据视为严格契约：
+
+1. **归一化 vs 像素坐标**：归一化坐标（`0..999`）提供跨不同视口分辨率的无量纲空间参考；像素坐标提供与硬件缓冲区的 1:1 映射。
+2. **确定性解析流水线**：边界框在单次确定性流水线中依次经历缩放、原点转换、边距扩充与边界截断。
+3. **截断透明度**：每份回执均透明展示 `resolvedPixelBox`（实际裁剪矩形）与 `unclampedPixelBox`，并包含 `clamped` 布尔标志指明是否发生了边界截断。
+4. **快速失败机制**：在 `crop-multi` 中，若任意一个框校验失败或在 `--no-clamp` 下越界，将零写入文件并直接以退出码 `2` 或 `1` 退出。
+5. **无隐式状态**：命令不依赖或产生后台文件锁、临时数据库或隐藏会话；输出路径完全由显式配置或确定性算法决定。
+
+## 核心特性
+
+- **基于证据的检查**：根据显式坐标生成像素级精确的裁剪图和预览图，将视觉推理锚定在可验证的图像内容上，减少无依据的判断。
+- **纯本地且零后台常驻**：基于 `sharp` 和原生 `libvips` 的独立 CLI；进程内执行，零后台守护进程、零网络请求、即开即用。
+- **双坐标空间支持**：支持论文风格的千分位归一化坐标 `0..999`（遵循 *Thinking with Visual Primitives* 论文规范）与直接像素坐标。
+- **灵活的坐标几何配置**：支持标准左上原点（`top-left`）或笛卡尔左下原点（`bottom-left`，y 轴向上），支持 `left-top-right-bottom`（`ltrb`）或 `left-bottom-right-top`（`lbrt`）元组。
+- **原子级快速失败批量处理**：`vp crop-multi` 单次调用即可批量裁剪多个命名区域；若任意坐标或框体非法，立即干净中止，不产生部分残留文件。
+- **CSS 级高精色彩采样**：`vp colors` 支持采样单像素或奇数 $N \times N$ 像素色块，返回 RGB、Hex、OKLab 空间坐标及色块均值统计，辅助精准还原设计样式。
+- **跨 Harness 通用的 Agent Skill Set**：提供六个遵循开放 Agent Skills 标准的通用技能（可在各类 Agent Harness 中通用，包括 Pi、Claude Code、Cursor 等），覆盖通用视觉证据提取、Oracle Intake、单 Agent 循环、多子 Agent 编排、反馈综合与最终交付审查。
+- **Masked Oracle Diff 引擎**：专用工作流辅助工具，对比 Oracle 参考设计与渲染实现，严格将纯代码绘制区域与获批的非代码图像排除项隔离。
+- **双输入模式**：为交互式 Shell 提供符合人体工程学的 CLI flags，同时支持 `--json <file|->` 以便接入机器流水线与自动化脚本。
+- **可预测的机器交互契约**：`stdout` 输出版本化 JSON 回执，`stderr` 输出人类可读摘要（可用 `--quiet` 抑制），具备固定退出码（`0` 成功，`1` 运行时/IO 错误，`2` 参数/校验错误）。
+
+## 快速开始
+
+### 环境要求
+
+- Node.js 22.18 或更高版本
+- Linux、macOS 或 Windows
+- 交互式终端或无头自动化环境
+- 可选：支持 Agent Skills 的任意 Coding Agent Harness（如 [Pi](https://github.com/earendil-works/pi)、Claude Code、Cursor 等），用于驱动 Agent 自动化复现
+
+### 安装
+
+#### CLI 安装 (npm)
+
+从 npm 全局安装两个等价的二进制别名（`vp` 与 `visual-primitives`）：
+
+```bash
+npm install -g @mapleluvr/visual-primitives
+vp --help
+visual-primitives --version
+```
+
+这两个命令别名完全等价。
+
+#### 在 Pi 中安装 Skill Set
+
+Skills 遵循开放的 Agent Skills 标准，跨各类 Agent Harness 通用。在 Pi 中，可直接通过内置命令安装以启用六个视觉复现与证据 Skills：
+
+```bash
+# 安装固定的 npm 版本
+pi install npm:@mapleluvr/visual-primitives@0.2.0
+
+# 或安装固定的 Git 发布 tag
+pi install git:github.com/mapleluvr/visual-primitives@v0.2.0
+```
+
+> [!NOTE]
+> Pi package 清单**仅暴露 Skills**，刻意不注册旧版插件工具。由于在某些环境中安装 Pi package 无法保证 npm 二进制进入系统 `PATH`，Agent Skills 会自动通过 `skills/_shared/run-vp.mjs` 调用内置 CLI；人类用户仍可直接使用全局安装的 `vp` 命令。
+
+### 快速上手
+
+创建工作目录，将一张至少 `1440 × 900` 的截图复制为其中的 `screenshot.png`，再运行下面的坐标示例。若使用其他尺寸或布局，先调整框和点；这些坐标不是自动检测结果。
+
+```bash
+mkdir vp-demo
+cd vp-demo
+```
+
+#### 1. 在预览图上标注假设
+
+在原图上绘制带标签的边界框，在得出视觉结论前验证坐标假设：
+
+```bash
+vp annotate screenshot.png \
+  --box "header:0,0,1440,80:#00aaff" \
+  --box "sidebar:0,80,260,900:#ff0055" \
+  --box "content:260,80,1440,900" \
+  --out preview.png
+```
+
+#### 2. 聚焦裁剪单个区域
+
+裁剪精确的矩形边界框，进行高精度的局部视觉检查：
+
+```bash
+vp crop screenshot.png --box "40,30,240,180" --out header-card.png
+```
+
+使用千分位归一化坐标（0..999）：
+
+```bash
+vp crop screenshot.png --box "28,33,167,200" --space normalized-999 --out header-card.png
+```
+
+#### 3. 批量裁剪多个区域
+
+单次原子调用裁剪多个带标签区域，输出文件将根据标签确定性命名：
+
+```bash
+vp crop-multi screenshot.png \
+  --out-dir ./crops \
+  --box "logo:20,20,120,60" \
+  --box "search-bar:160,20,600,60" \
+  --box "user-avatar:1380,20,1420,60"
+```
+
+#### 4. 围绕指定兴趣点裁剪
+
+以显式坐标为中心提取正方形或矩形邻域：
+
+```bash
+# 使用半径（以 500, 300 为中心裁剪 160x160 正方形）
+vp point screenshot.png --point "500,300" --radius 80 --out target-center.png
+
+# 使用显式宽度与高度
+vp point screenshot.png --point "500,300" --size 120x80 --out target-rect.png
+```
+
+#### 5. 采样 CSS 与 OKLab 颜色
+
+采样精确像素点或色块均值，获取精确 CSS 样式数值：
+
+```bash
+vp colors screenshot.png \
+  --patch 3 \
+  --point "bg:10,10" \
+  --point "brand-red:420,280" \
+  --point "text-primary:100,50"
+```
+
+#### 6. 使用 JSON 输入接入流水线
+
+使用 `--json` 从文件或 `stdin` 传入完整结构化负载：
+
+```bash
+vp crop --json crop-spec.json
+cat crop-spec.json | vp crop --json -
+```
+
+```json
+{
+  "imagePath": "screenshot.png",
+  "box": [40, 30, 240, 180],
+  "coordinateSpace": "pixel",
+  "outputPath": "header.png"
+}
+```
+
+### 阅读回执
 
 ```bash
 vp annotate screenshot.png --box "header:40,30,240,180" --out annotated.png
@@ -85,142 +236,39 @@ vp colors screenshot.png --point "header-bg:80,50" --patch 3
 
 对于自动化 Agent 或无头流水线，`--json <file|->` 支持通过文件或 `stdin` 传入完整 JSON 负载，保留旧版工具的负载结构并默认使用千分位归一化坐标。
 
-## 核心特性
+## 命令行参考
 
-- **基于证据的检查**：根据显式坐标生成像素级精确的裁剪图和预览图，将视觉推理锚定在可验证的实际上，杜绝模型幻觉。
-- **纯本地且零后台常驻**：基于 `sharp` 和原生 `libvips` 的独立 CLI；进程内执行，零后台守护进程、零网络请求、即开即用。
-- **双坐标空间支持**：支持论文风格的千分位归一化坐标 `0..999`（遵循 *Thinking with Visual Primitives* 论文规范）与直接像素坐标。
-- **灵活的坐标几何配置**：支持标准左上原点（`top-left`）或笛卡尔左下原点（`bottom-left`，y 轴向上），支持 `left-top-right-bottom`（`ltrb`）或 `left-bottom-right-top`（`lbrt`）元组。
-- **原子级快速失败批量处理**：`vp crop-multi` 单次调用即可批量裁剪多个命名区域；若任意坐标或框体非法，立即干净中止，不产生部分残留文件。
-- **CSS 级高精色彩采样**：`vp colors` 支持采样单像素或奇数 $N \times N$ 像素色块，返回 RGB、Hex、OKLab 空间坐标及色块均值统计，辅助精准还原设计样式。
-- **跨 Harness 通用的 Agent Skill Set**：提供六个遵循开放 Agent Skills 标准的通用技能（可在各类 Agent Harness 中通用，包括 Pi、Claude Code、Cursor 等），覆盖通用视觉证据提取、Oracle Intake、单 Agent 循环、多子 Agent 编排、反馈综合与最终交付审查。
-- **Masked Oracle Diff 引擎**：专用工作流辅助工具，对比 Oracle 参考设计与渲染实现，严格将纯代码绘制区域与获批的非代码图像排除项隔离。
-- **双输入模式**：为交互式 Shell 提供符合人体工程学的 CLI flags，同时支持 `--json <file|->` 以便接入机器流水线与自动化脚本。
-- **可预测的机器交互契约**：`stdout` 输出版本化 JSON 回执，`stderr` 输出人类可读摘要（可用 `--quiet` 抑制），具备固定退出码（`0` 成功，`1` 运行时/IO 错误，`2` 参数/校验错误）。
+| 命令 | 用途 |
+| --- | --- |
+| `vp crop <image> --box <l,t,r,b> [options]` | 从源图像裁剪一个矩形区域。 |
+| `vp crop-multi <image> --box <[label:]l,t,r,b> ...` | 单次原子调用批量裁剪多个带标签区域（快速失败）。 |
+| `vp annotate <image> --box <[label:]l,t,r,b[:color]> ...` | 在同尺寸预览图上绘制带标签的边界框与描边。 |
+| `vp point <image> --point <x,y> (--radius <n> \| --size <WxH>)` | 围绕显式坐标裁剪矩形或正方形邻域。 |
+| `vp colors <image> --point <[label:]x,y> ...` | 采样精确像素或色块均值（RGB、Hex、OKLab、均值统计）。 |
 
-## 环境要求
+### 通用选项
 
-- Node.js 22.18 或更高版本
-- Linux、macOS 或 Windows
-- 交互式终端或无头自动化环境
-- 可选：支持 Agent Skills 的任意 Coding Agent Harness（如 [Pi](https://github.com/earendil-works/pi)、Claude Code、Cursor 等），用于驱动 Agent 自动化复现
+| 选项 | 取值 | 默认值 | 描述 |
+| --- | --- | --- | --- |
+| `-i, --image <path>` | 文件路径 | 位置参数 1 | 源图像路径（支持 PNG、JPEG、WebP、AVIF、TIFF、GIF、SVG）。 |
+| `-s, --space <space>` | `pixel` \| `normalized-999` | `pixel` | 坐标空间解释（支持 `px`、`999` 别名）。 |
+| `--origin <origin>` | `top-left` \| `bottom-left` | `top-left` | 坐标原点（`bottom-left` 表示 y 轴向上增长）。 |
+| `--box-order <order>` | `ltrb` \| `lbrt` | `ltrb` | 坐标元组顺序（`left-top-right-bottom` 或 `left-bottom-right-top`）。 |
+| `--padding <n>` | 非负整数 | `0` | 在解析后的矩形外周额外扩充的像素外边距。 |
+| `--no-clamp` | 标志 | 开启截断 | 超出图像边界的框直接报错，而非截断到图像范围。 |
+| `--json <file\|->` | 文件路径或 `-` | 无 | 将完整输入作为 JSON 读取；忽略其他输入 flags。 |
+| `--compact` | 标志 | 格式化输出 | 输出紧凑单行 JSON，而非格式化缩进。 |
+| `-q, --quiet` | 标志 | 详细输出 | 抑制输出到 `stderr` 的单行人类可读摘要。 |
+| `-h, --help` | 标志 | 无 | 显示全局或子命令用法帮助。 |
+| `-v, --version` | 标志 | 无 | 显示当前安装的 package 版本。 |
 
-## 安装
+### 退出状态码
 
-### CLI 安装 (npm)
-
-从 npm 全局安装两个等价的二进制别名（`vp` 与 `visual-primitives`）：
-
-```bash
-npm install -g @mapleluvr/visual-primitives
-vp --help
-visual-primitives --version
-```
-
-这两个命令别名完全等价。
-
-### 在 Pi 中安装 Skill Set
-
-Skills 遵循开放的 Agent Skills 标准，跨各类 Agent Harness 通用。在 Pi 中，可直接通过内置命令安装以启用六个视觉复现与证据 Skills：
-
-```bash
-# 安装固定的 npm 版本
-pi install npm:@mapleluvr/visual-primitives@0.2.0
-
-# 或安装固定的 Git 发布 tag
-pi install git:github.com/mapleluvr/visual-primitives@v0.2.0
-```
-
-> [!NOTE]
-> Pi package 清单**仅暴露 Skills**，刻意不注册旧版插件工具。由于在某些环境中安装 Pi package 无法保证 npm 二进制进入系统 `PATH`，Agent Skills 会自动通过 `skills/_shared/run-vp.mjs` 调用内置 CLI；人类用户仍可直接使用全局安装的 `vp` 命令。
-
-## 快速上手
-
-创建工作目录并体验核心视觉证据命令：
-
-```bash
-mkdir vp-demo
-cd vp-demo
-```
-
-### 1. 在预览图上标注假设
-
-在原图上绘制带标签的边界框，在得出视觉结论前验证坐标假设：
-
-```bash
-vp annotate screenshot.png \
-  --box "header:0,0,1440,80:#00aaff" \
-  --box "sidebar:0,80,260,900:#ff0055" \
-  --box "content:260,80,1440,900" \
-  --out preview.png
-```
-
-### 2. 聚焦裁剪单个区域
-
-裁剪精确的矩形边界框，进行高精度的局部视觉检查：
-
-```bash
-vp crop screenshot.png --box "40,30,240,180" --out header-card.png
-```
-
-使用千分位归一化坐标（0..999）：
-
-```bash
-vp crop screenshot.png --box "28,33,167,200" --space normalized-999 --out header-card.png
-```
-
-### 3. 批量裁剪多个区域
-
-单次原子调用裁剪多个带标签区域，输出文件将根据标签确定性命名：
-
-```bash
-vp crop-multi screenshot.png \
-  --out-dir ./crops \
-  --box "logo:20,20,120,60" \
-  --box "search-bar:160,20,600,60" \
-  --box "user-avatar:1380,20,1420,60"
-```
-
-### 4. 围绕指定兴趣点裁剪
-
-以显式坐标为中心提取正方形或矩形邻域：
-
-```bash
-# 使用半径（以 500, 300 为中心裁剪 160x160 正方形）
-vp point screenshot.png --point "500,300" --radius 80 --out target-center.png
-
-# 使用显式宽度与高度
-vp point screenshot.png --point "500,300" --size 120x80 --out target-rect.png
-```
-
-### 5. 采样 CSS 与 OKLab 颜色
-
-采样精确像素点或色块均值，获取精确 CSS 样式数值：
-
-```bash
-vp colors screenshot.png \
-  --patch 3 \
-  --point "bg:10,10" \
-  --point "brand-red:420,280" \
-  --point "text-primary:100,50"
-```
-
-### 6. 使用 JSON 输入接入流水线
-
-使用 `--json` 从文件或 `stdin` 传入完整结构化负载：
-
-```bash
-vp crop --json crop-spec.json
-cat crop-spec.json | vp crop --json -\n```
-
-```json
-{
-  "imagePath": "screenshot.png",
-  "box": [40, 30, 240, 180],
-  "coordinateSpace": "pixel",
-  "outputPath": "header.png"
-}
-```
+| 退出码 | 含义 | 标准输出 (stdout) | 标准错误 (stderr) |
+| :---: | --- | --- | --- |
+| `0` | 执行成功 | 结构化 JSON 回执 | 单行摘要（除非指定 `--quiet`） |
+| `1` | 运行时 / 图像 / IO 错误 | 空 | 详细错误信息 |
+| `2` | 用法 / 参数校验错误 | 空 | 帮助提示或 Schema 校验失败信息 |
 
 ## 视觉证据与复现工作流
 
@@ -235,7 +283,8 @@ Replicate the frontend screenshot at <path> (viewport <W>x<H>). Follow the
 frontend-replication workflow strictly.
 
 - Match the oracle's exact pixel dimensions in the rendered screenshot.
-- Render every code-drawable region in code (CSS/SVG): text, table columns,\n  icons, badges, status pills, progress bars, and brand colors.
+- Render every code-drawable region in code (CSS/SVG): text, table columns,
+  icons, badges, status pills, progress bars, and brand colors.
 - Approved exclusions may be represented by placeholders or delegated image assets:
   avatars, album / cover art, organic illustrations, and dense logo marks.
 - Keep code-drawable content inside the scoring domain; use exclusions only for
@@ -282,50 +331,6 @@ Oracle 是一张真实网易云音乐桌面客户端截图（`1448x940`）——
 3. **部分图标字重**：个别导航图标与原图相差一个字重等级。
 
 视觉证据工具（`vp annotate`、`vp crop`、`masked-oracle-diff`）能够精准定位这些细小偏差，为下一轮迭代微调提供确定性依据。
-
-## 命令行参考
-
-| 命令 | 用途 |
-| --- | --- |
-| `vp crop <image> --box <l,t,r,b> [options]` | 从源图像裁剪一个矩形区域。 |
-| `vp crop-multi <image> --box <[label:]l,t,r,b> ...` | 单次原子调用批量裁剪多个带标签区域（快速失败）。 |
-| `vp annotate <image> --box <[label:]l,t,r,b[:color]> ...` | 在同尺寸预览图上绘制带标签的边界框与描边。 |
-| `vp point <image> --point <x,y> (--radius <n> \| --size <WxH>)` | 围绕显式坐标裁剪矩形或正方形邻域。 |
-| `vp colors <image> --point <[label:]x,y> ...` | 采样精确像素或色块均值（RGB、Hex、OKLab、均值统计）。 |
-
-### 通用选项
-
-| 选项 | 取值 | 默认值 | 描述 |
-| --- | --- | --- | --- |
-| `-i, --image <path>` | 文件路径 | 位置参数 1 | 源图像路径（支持 PNG、JPEG、WebP、AVIF、TIFF、GIF、SVG）。 |
-| `-s, --space <space>` | `pixel` \| `normalized-999` | `pixel` | 坐标空间解释（支持 `px`、`999` 别名）。 |
-| `--origin <origin>` | `top-left` \| `bottom-left` | `top-left` | 坐标原点（`bottom-left` 表示 y 轴向上增长）。 |
-| `--box-order <order>` | `ltrb` \| `lbrt` | `ltrb` | 坐标元组顺序（`left-top-right-bottom` 或 `left-bottom-right-top`）。 |
-| `--padding <n>` | 非负整数 | `0` | 在解析后的矩形外周额外扩充的像素外边距。 |
-| `--no-clamp` | 标志 | 开启截断 | 超出图像边界的框直接报错，而非截断到图像范围。 |
-| `--json <file\|->` | 文件路径或 `-` | 无 | 将完整输入作为 JSON 读取；忽略其他输入 flags。 |
-| `--compact` | 标志 | 格式化输出 | 输出紧凑单行 JSON，而非格式化缩进。 |
-| `-q, --quiet` | 标志 | 详细输出 | 抑制输出到 `stderr` 的单行人类可读摘要。 |
-| `-h, --help` | 标志 | 无 | 显示全局或子命令用法帮助。 |
-| `-v, --version` | 标志 | 无 | 显示当前安装的 package 版本。 |
-
-### 退出状态码
-
-| 退出码 | 含义 | 标准输出 (stdout) | 标准错误 (stderr) |
-| :---: | --- | --- | --- |
-| `0` | 执行成功 | 结构化 JSON 回执 | 单行摘要（除非指定 `--quiet`） |
-| `1` | 运行时 / 图像 / IO 错误 | 空 | 详细错误信息 |
-| `2` | 用法 / 参数校验错误 | 空 | 帮助提示或 Schema 校验失败信息 |
-
-## 证据模型
-
-`visual-primitives` 将空间证据视为严格契约：
-
-1. **归一化 vs 像素坐标**：归一化坐标（`0..999`）提供跨不同视口分辨率的无量纲空间参考；像素坐标提供与硬件缓冲区的 1:1 映射。
-2. **确定性解析流水线**：边界框在单次确定性流水线中依次经历缩放、原点转换、边距扩充与边界截断。
-3. **截断透明度**：每份回执均透明展示 `resolvedPixelBox`（实际裁剪矩形）与 `unclampedPixelBox`，并包含 `clamped` 布尔标志指明是否发生了边界截断。
-4. **快速失败机制**：在 `crop-multi` 中，若任意一个框校验失败或在 `--no-clamp` 下越界，将零写入文件并直接以退出码 `2` 或 `1` 退出。
-5. **无隐式状态**：命令不依赖或产生后台文件锁、临时数据库或隐藏会话；输出路径完全由显式配置或确定性算法决定。
 
 ## Skill Set
 
@@ -376,6 +381,20 @@ Helper 会在运行工作区中生成全套诊断证据：
 > [!NOTE]
 > 干净的 Diff 分数仅代表可以开启最终直接视觉检查；它**不能单独等同于交付验收**。直接视觉检查是不可逾越的最终防线。
 
+## 项目结构
+
+```text
+visual-primitives/
+├── src/                 # CLI、schema、裁剪和颜色处理
+├── skills/              # 六个 Agent Skills
+│   ├── _shared/         # 包内 CLI 启动器
+│   └── frontend-replication/scripts/ # Masked Oracle Diff
+├── scripts/             # 构建、打包冒烟和发布检查
+├── tests/               # 合成图像与 CLI 合同测试
+├── docs/                # 设计、真实案例和工作流记录
+└── assets/              # README 标题图
+```
+
 ## 复现运行工作区
 
 复现工作流在标准化的目录结构下组织持久化工件：
@@ -392,6 +411,17 @@ docs/visual-primitives/runs/<run-id>/
   scripts/       # 运行专属的截图与配置脚本
   final/         # 最终直接视觉检查记录与交付审查工件
 ```
+
+## 支持范围
+
+| 能力 | 当前边界 |
+| --- | --- |
+| 本地图像处理 | Node.js ≥22.18；Linux / macOS / Windows |
+| 坐标来源 | 人或 Agent 明确给出；不做目标检测、OCR 或自动分割 |
+| Pi 集成 | 只加载 Skills，不注册旧版原生 extension tools |
+| Masked Oracle Diff | 属于前端复现工作流，不是 `vp` 子命令 |
+| 分数与验收 | Diff 只提供诊断信号，最终仍需直接视觉检查 |
+| 运行状态 | 无守护进程、无隐藏延续会话；按指定路径生成工件 |
 
 ## 版本策略
 
@@ -451,8 +481,16 @@ CI 流水线在 Ubuntu、macOS 与 Windows 上对 Node 22.18.0 及 Node 24.x 持
 
 - **严格的 Schema 准入**：CLI 严格拒绝未知的 JSON 属性、非有限坐标值、越界枚举与冲突选项。
 - **失败闭合机制**：遇到损坏的图像头、不可读文件或畸形坐标时，立即终止并返回清晰的诊断信息。
-- **沙箱化操作**：所有图像计算均通过经过安全审计的原生库完成，绝不进行 Shell 变量展开或动态脚本执行。
+- **本地图像处理**：图像计算通过原生库完成，不进行 Shell 变量展开或动态脚本执行；这不等于通用安全沙箱。
 
 ## 许可证
 
 基于 [MIT 许可证](LICENSE) 发布。
+
+---
+
+<div align="center">
+
+**明确坐标，保留证据，亲眼检查。**
+
+</div>
